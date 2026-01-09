@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Register • Seven33 Blog</title>
+<style>
+    :root {
+        --bg-color: #f0f0f0;
+        --text-color: #000;
+        --link-color: #007BFF;
+        --input-bg: #fff;
+        --input-text: #000;
+        --input-border: #ccc;
+    }
+
+    body.dark {
+        --bg-color: #121212;
+        --text-color: #eee;
+        --link-color: #66b2ff;
+        --input-bg: #1e1e1e;
+        --input-text: #eee;
+        --input-border: #444;
+    }
+
+    body {
+        font-family: Arial, sans-serif;
+        margin:0; padding:0;
+        background: var(--bg-color);
+        color: var(--text-color);
+        transition: 0.3s;
+    }
+
+    .container { max-width:400px; margin:5rem auto; padding:2rem; border-radius:10px; background: var(--input-bg); box-shadow: 0 4px 8px rgba(0,0,0,0.1);}
+    h1 { text-align:center; margin-bottom:1rem;}
+    form { display:flex; flex-direction:column; gap:1rem; }
+    input { padding:0.5rem; font-size:1rem; border:1px solid var(--input-border); border-radius:5px; background: var(--input-bg); color: var(--input-text);}
+    button { padding:0.5rem; font-size:1rem; border:none; border-radius:5px; background:#007BFF; color:#fff; cursor:pointer;}
+    button:hover { background:#0056b3; }
+    .links { text-align:center; margin-top:1rem;}
+    a { color: var(--link-color); text-decoration:none;}
+    a:hover { text-decoration:underline; }
+    .toggle-btn { cursor:pointer; font-weight:bold; position:absolute; top:1rem; right:1rem;}
+</style>
+</head>
+<body>
+
+<span class="toggle-btn" id="modeToggle">🌙</span>
+
+<div class="container">
+    <h1>Register</h1>
+
+    <form method="POST">
+        <input type="text" name="username" placeholder="Username" required>
+        <input type="password" name="password" placeholder="Password" required>
+        <button type="submit">Register</button>
+    </form>
+
+    <div class="links">
+        <p>Already have an account? <a href="{{ url_for('login') }}">Login</a></p>
+    </div>
+</div>
+
+<script>
+    const toggleBtn = document.getElementById('modeToggle');
+    const body = document.body;
+
+    if(localStorage.getItem('mode') === 'dark'){
+        body.classList.add('dark');
+        toggleBtn.textContent = '☀️';
+    }
+
+    toggleBtn.addEventListener('click', () => {
+        body.classList.toggle('dark');
+        if(body.classList.contains('dark')){
+            toggleBtn.textContent = '☀️';
+            localStorage.setItem('mode','dark');
+        } else {
+            toggleBtn.textContent = '🌙';
+            localStorage.setItem('mode','light');
+        }
+    });
+</script>
+
+</body>
+</html>

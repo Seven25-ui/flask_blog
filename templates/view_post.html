@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ post.title }} • Seven33 Blog</title>
+<style>
+    :root {
+        --bg-color: #f0f0f0;
+        --text-color: #000;
+        --link-color: #007BFF;
+        --meta-color: #555;
+    }
+
+    body.dark {
+        --bg-color: #121212;
+        --text-color: #eee;
+        --link-color: #66b2ff;
+        --meta-color: #aaa;
+    }
+
+    body { 
+        font-family: Arial, sans-serif; 
+        margin:0; padding:0; 
+        background: var(--bg-color); 
+        color: var(--text-color); 
+        transition: 0.3s; 
+    }
+
+    .container { max-width:800px; margin:2rem auto; padding:1rem; }
+    a { color: var(--link-color); text-decoration:none; }
+    a:hover { text-decoration:underline; }
+    .meta { font-size:0.9rem; color: var(--meta-color); margin-bottom:1rem; }
+    .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; }
+    .toggle-btn { cursor:pointer; font-weight:bold; }
+</style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <a href="{{ url_for('dashboard') }}">← Back to Dashboard</a>
+        <span class="toggle-btn" id="modeToggle">🌙</span>
+    </div>
+
+    <h1>{{ post.title }}</h1>
+    <div class="meta">By {{ post.author }} | {{ post.created_at.strftime('%b %d, %Y %H:%M') }}</div>
+    <p>{{ post.content }}</p>
+</div>
+
+<script>
+    const toggleBtn = document.getElementById('modeToggle');
+    const body = document.body;
+
+    // Load saved mode from localStorage
+    if(localStorage.getItem('mode') === 'dark'){
+        body.classList.add('dark');
+        toggleBtn.textContent = '☀️';
+    }
+
+    toggleBtn.addEventListener('click', () => {
+        body.classList.toggle('dark');
+        if(body.classList.contains('dark')){
+            toggleBtn.textContent = '☀️';
+            localStorage.setItem('mode','dark');
+        } else {
+            toggleBtn.textContent = '🌙';
+            localStorage.setItem('mode','light');
+        }
+    });
+</script>
+
+</body>
+</html>

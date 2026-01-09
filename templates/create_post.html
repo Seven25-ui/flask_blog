@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Create Post • Seven33 Blog</title>
+<style>
+    :root {
+        --bg-color: #f0f0f0;
+        --text-color: #000;
+        --link-color: #007BFF;
+        --input-bg: #fff;
+        --input-text: #000;
+        --input-border: #ccc;
+    }
+
+    body.dark {
+        --bg-color: #121212;
+        --text-color: #eee;
+        --link-color: #66b2ff;
+        --input-bg: #1e1e1e;
+        --input-text: #eee;
+        --input-border: #444;
+    }
+
+    body { 
+        font-family: Arial, sans-serif; 
+        margin:0; padding:0; 
+        background: var(--bg-color); 
+        color: var(--text-color); 
+        transition: 0.3s;
+    }
+
+    .container { max-width:800px; margin:2rem auto; padding:1rem; }
+    a { color: var(--link-color); text-decoration:none; }
+    a:hover { text-decoration:underline; }
+    .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; }
+    .toggle-btn { cursor:pointer; font-weight:bold; }
+
+    form { display:flex; flex-direction:column; gap:1rem; }
+    input[type="text"], textarea { 
+        padding:0.5rem; font-size:1rem; border:1px solid var(--input-border); 
+        border-radius:5px; background: var(--input-bg); color: var(--input-text);
+    }
+    textarea { min-height:200px; resize:vertical; }
+    button { padding:0.5rem 1rem; font-size:1rem; cursor:pointer; border:none; border-radius:5px; background:#007BFF; color:#fff; }
+    button:hover { background:#0056b3; }
+</style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <a href="{{ url_for('dashboard') }}">← Back to Dashboard</a>
+        <span class="toggle-btn" id="modeToggle">🌙</span>
+    </div>
+
+    <h1>Create New Post</h1>
+
+    <form method="POST">
+        <label>Title</label>
+        <input type="text" name="title" placeholder="Enter post title" required>
+
+        <label>Content</label>
+        <textarea name="content" placeholder="Write your post content here..." required></textarea>
+
+        <button type="submit">Create Post</button>
+    </form>
+</div>
+
+<script>
+    const toggleBtn = document.getElementById('modeToggle');
+    const body = document.body;
+
+    // Load saved mode from localStorage
+    if(localStorage.getItem('mode') === 'dark'){
+        body.classList.add('dark');
+        toggleBtn.textContent = '☀️';
+    }
+
+    toggleBtn.addEventListener('click', () => {
+        body.classList.toggle('dark');
+        if(body.classList.contains('dark')){
+            toggleBtn.textContent = '☀️';
+            localStorage.setItem('mode','dark');
+        } else {
+            toggleBtn.textContent = '🌙';
+            localStorage.setItem('mode','light');
+        }
+    });
+</script>
+
+</body>
+</html>
