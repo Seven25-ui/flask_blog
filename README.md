@@ -1,18 +1,59 @@
-Flask Blog
-A simple Flask-based blog application with user authentication, post management, and clean UI. Perfect for personal blogs, tutorials, or small projects.
-Features
-✅ User registration and login system
-✅ Create, edit, and delete posts
-✅ Post slugs for clean URLs (/post/<slug>)
-✅ Dashboard for managing posts
-✅ Author and timestamp tracking for each post
-✅ SQLite database (stored in instance/blog.db)
-✅ Fully customizable templates (templates/) and static files (static/)
+# Flask Blog
+
+A simple Flask-based blog application with user authentication, post management, and clean UI.
+
+## Features
+- User registration and login system
+- Create, edit, and delete posts
+- Post slugs for clean URLs (/post/)
+- Dashboard for managing posts
+- Author and timestamp tracking for each post
+- SQLite database (stored in instance/blog.db)
+- Fully customizable templates (templates/) and static files (static/)
+
+## Screenshots
+
+### Dashboard
+![Dashboard](images/IMG_20260109_235540.jpg)
+
+### Create Post
+![Create Post](images/IMG_20260109_235446.jpg)
+
+### Post View
+![Post View](images/IMG_20260109_235501.jpg)
+
+## Setup & Installation
+
+Clone the repository:
+```bash
+git clone https://github.com/Seven25-ui/flask_blog.git
+cd flask_blog
+Create a virtual environment and activate it:
+Copy code
+Bash
+python3 -m venv venv
+source venv/bin/activate   # Linux / macOS / Termux
+venv\Scripts\activate      # Windows
+Install dependencies:
+Copy code
+Bash
+pip install flask flask_sqlalchemy werkzeug
+Run the app:
+Copy code
+Bash
+python app.py
+Open in browser: http://127.0.0.1:5000
+First time: register a user → login → access dashboard → create posts.
+Git Cleanup Script
+You can run clean_git.sh to compress Git history and force-push changes:
+Copy code
+Bash
+./clean_git.sh
+Useful if your repo has too many large files or you just added .gitignore.
 Project Structure
 Copy code
 
 flask_blog/
-│
 ├─ app.py              # Main Flask app
 ├─ README.md           # Project documentation
 ├─ clean_git.sh        # Script to clean & compress Git history
@@ -21,41 +62,8 @@ flask_blog/
 ├─ venv/               # Virtual environment (ignored in git)
 ├─ __pycache__/        # Python cache
 ├─ static/             # CSS, JS, images
-└─ templates/          # HTML templates
-Setup & Installation
-Clone the repository:
-Copy code
-Bash
-git clone https://github.com/Seven25-ui/flask_blog.git
-cd flask_blog
-Create a virtual environment and activate it:
-Copy code
-Bash
-python3 -m venv venv
-source venv/bin/activate   # Linux / Termux / macOS
-venv\Scripts\activate      # Windows
-Install dependencies:
-Copy code
-Bash
-pip install -r requirements.txt
-(If requirements.txt is missing, just install Flask & SQLAlchemy manually)
-Copy code
-Bash
-pip install flask flask_sqlalchemy werkzeug
-Run the app:
-Copy code
-Bash
-python app.py
-Open in browser:
-Go to http://127.0.0.1:5000
-First time, register a user
-Login to access the dashboard and create posts
-Git Cleanup Script
-You can run clean_git.sh to compress Git history and force-push changes:
-Copy code
-Bash
-./clean_git.sh
-This is useful if your repo has too many large files or you just added .gitignore.
+├─ templates/          # HTML templates
+└─ images/             # Screenshots for README
 Contribution
 Fork the repo
 Make changes / improvements
