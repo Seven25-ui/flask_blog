@@ -13,8 +13,6 @@
         --card-bg: #fff;
         --card-text: #000;
         --link-color: #007BFF;
-        --flash-bg: #d4edda;
-        --flash-text: #155724;
     }
 
     body.dark {
@@ -25,11 +23,9 @@
         --card-bg: #1e1e1e;
         --card-text: #fff;
         --link-color: #66b2ff;
-        --flash-bg: #27472b;
-        --flash-text: #a6d4a6;
     }
 
-    body { font-family: Arial, sans-serif; background: var(--bg-color); color: var(--text-color); margin:0; padding:0; transition: 0.3s; }
+    body { font-family: Arial, sans-serif; background: var(--bg-color); color: var(--text-color); margin:0; padding:0; transition:0.3s; }
     header { background: var(--header-bg); color: var(--header-text); padding:1rem; display:flex; justify-content:space-between; align-items:center; }
     a { color: var(--header-text); text-decoration:none; margin-left:1rem; }
     .container { padding:2rem; }
@@ -38,8 +34,7 @@
     .meta { font-size:0.9rem; color:#555; margin-bottom:0.5rem; }
     .actions a { margin-right:0.5rem; text-decoration:none; color: var(--link-color); }
     .actions a:hover { text-decoration:underline; }
-    .flash { background: var(--flash-bg); color: var(--flash-text); padding:0.5rem 1rem; border-radius:4px; margin-bottom:1rem; }
-
+    .flash { background:#d4edda; color:#155724; padding:0.5rem 1rem; border-radius:4px; margin-bottom:1rem; }
     .toggle-btn { cursor:pointer; font-weight:bold; margin-left:1rem; }
 </style>
 </head>
@@ -81,25 +76,14 @@
 </div>
 
 <script>
-    const toggleBtn = document.getElementById('modeToggle');
-    const body = document.body;
-
-    // Check saved mode in localStorage
-    if (localStorage.getItem('mode') === 'dark') {
-        body.classList.add('dark');
-        toggleBtn.textContent = '☀️';
-    }
-
-    toggleBtn.addEventListener('click', () => {
-        body.classList.toggle('dark');
-        if(body.classList.contains('dark')){
-            toggleBtn.textContent = '☀️';
-            localStorage.setItem('mode', 'dark');
-        } else {
-            toggleBtn.textContent = '🌙';
-            localStorage.setItem('mode', 'light');
-        }
-    });
+const toggleBtn = document.getElementById('modeToggle');
+const body = document.body;
+if (localStorage.getItem('mode') === 'dark') { body.classList.add('dark'); toggleBtn.textContent = '☀️'; }
+toggleBtn.addEventListener('click', () => {
+    body.classList.toggle('dark');
+    if(body.classList.contains('dark')){ toggleBtn.textContent = '☀️'; localStorage.setItem('mode', 'dark'); }
+    else { toggleBtn.textContent = '🌙'; localStorage.setItem('mode', 'light'); }
+});
 </script>
 
 </body>

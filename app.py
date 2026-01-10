@@ -38,17 +38,13 @@ with app.app_context():
 
 # --- HELPER ---
 def make_slug(title):
-    # Remove special chars, replace spaces with dash, lowercase
     slug = re.sub(r'[^a-zA-Z0-9 ]', '', title)
     return slug.replace(" ", "-").lower()
 
 # --- ROUTES ---
 @app.route('/')
-def home():
-    if not session.get('user_id'):
-        return redirect(url_for('login'))
-    posts = Post.query.order_by(Post.created_at.desc()).all()
-    return render_template('home.html', posts=posts)
+def root_redirect():
+    return redirect(url_for('public_home'))
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -173,6 +169,12 @@ def delete_post(post_id):
 def view_post(slug):
     post = Post.query.filter_by(slug=slug).first_or_404()
     return render_template('view_post.html', post=post)
+
+@app.route('/home')
+@app.route('/home/<int:page>')
+def public_home(page=1):
+    posts = Post.query.order_by(Post.created_at.desc()).paginate(page=page, per_page=5)
+    return render_template('home_public.html', posts=posts)
 
 # --- RUN APP ---
 if __name__ == "__main__":

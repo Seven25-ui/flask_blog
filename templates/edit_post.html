@@ -3,68 +3,127 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Edit Post • Seven33 Blog</title>
+<title>Edit: {{ post.title }} | Seven33 Blog</title>
 <style>
     :root {
-        --bg-color: #f0f0f0;
-        --text-color: #000;
+        --bg-color: #f5f5f5;
+        --text-color: #222;
+        --container-bg: #fff;
         --link-color: #007BFF;
-        --meta-color: #555;
         --input-bg: #fff;
-        --input-text: #000;
         --input-border: #ccc;
     }
 
     body.dark {
         --bg-color: #121212;
         --text-color: #eee;
+        --container-bg: #1e1e1e;
         --link-color: #66b2ff;
-        --meta-color: #aaa;
-        --input-bg: #1e1e1e;
-        --input-text: #eee;
-        --input-border: #444;
+        --input-bg: #2a2a2a;
+        --input-border: #555;
     }
 
-    body { 
-        font-family: Arial, sans-serif; 
-        margin:0; padding:0; 
-        background: var(--bg-color); 
-        color: var(--text-color); 
-        transition: 0.3s;
+    body {
+        font-family: Arial, sans-serif;
+        background: var(--bg-color);
+        color: var(--text-color);
+        margin:0;
+        padding:2rem;
+        transition:0.3s;
     }
 
-    .container { max-width:800px; margin:2rem auto; padding:1rem; }
-    a { color: var(--link-color); text-decoration:none; }
-    a:hover { text-decoration:underline; }
-    .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; }
-    .toggle-btn { cursor:pointer; font-weight:bold; }
-
-    form { display:flex; flex-direction:column; gap:1rem; }
-    input[type="text"], textarea { 
-        padding:0.5rem; font-size:1rem; border:1px solid var(--input-border); 
-        border-radius:5px; background: var(--input-bg); color: var(--input-text);
+    header {
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        margin-bottom:2rem;
     }
-    textarea { min-height:200px; resize:vertical; }
-    button { padding:0.5rem 1rem; font-size:1rem; cursor:pointer; border:none; border-radius:5px; background:#007BFF; color:#fff; }
-    button:hover { background:#0056b3; }
+
+    a {
+        text-decoration:none;
+        color: var(--link-color);
+        font-weight:bold;
+        margin-left:1rem;
+    }
+
+    .toggle-btn {
+        cursor:pointer;
+        font-weight:bold;
+    }
+
+    .container {
+        max-width: 800px;
+        margin:auto;
+        background: var(--container-bg);
+        padding:2rem;
+        border-radius:8px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+        margin-top:0;
+        margin-bottom:1rem;
+    }
+
+    label {
+        display:block;
+        margin-bottom:0.5rem;
+        font-weight:bold;
+    }
+
+    input[type="text"], textarea {
+        width:100%;
+        padding:0.8rem;
+        margin-bottom:1rem;
+        border:1px solid var(--input-border);
+        border-radius:6px;
+        background: var(--input-bg);
+        color: var(--text-color);
+        font-size:1rem;
+        transition:0.2s;
+    }
+
+    input[type="text"]:focus, textarea:focus {
+        outline:none;
+        border-color: var(--link-color);
+    }
+
+    button {
+        padding:0.8rem 1.5rem;
+        background: var(--link-color);
+        color:#fff;
+        border:none;
+        border-radius:6px;
+        cursor:pointer;
+        font-size:1rem;
+        transition:0.2s;
+    }
+
+    button:hover {
+        background: #0056b3;
+    }
 </style>
 </head>
 <body>
 
-<div class="container">
-    <div class="header">
-        <a href="{{ url_for('dashboard') }}">← Back to Dashboard</a>
-        <span class="toggle-btn" id="modeToggle">🌙</span>
+<header>
+    <div>
+        <a href="{{ url_for('public_home') }}">← Back to Home</a>
     </div>
+    <div>
+        <span class="toggle-btn" id="modeToggle">🌙</span>
+        <a href="{{ url_for('logout') }}">Logout</a>
+    </div>
+</header>
 
+<div class="container">
     <h1>Edit Post</h1>
-
     <form method="POST">
-        <label>Title</label>
-        <input type="text" name="title" value="{{ post.title }}" required>
+        <label for="title">Title</label>
+        <input type="text" name="title" id="title" value="{{ post.title }}" required>
 
-        <label>Content</label>
-        <textarea name="content" required>{{ post.content }}</textarea>
+        <label for="content">Content</label>
+        <textarea name="content" id="content" rows="10" required>{{ post.content }}</textarea>
 
         <button type="submit">Update Post</button>
     </form>
@@ -74,7 +133,6 @@
     const toggleBtn = document.getElementById('modeToggle');
     const body = document.body;
 
-    // Load saved mode from localStorage
     if(localStorage.getItem('mode') === 'dark'){
         body.classList.add('dark');
         toggleBtn.textContent = '☀️';

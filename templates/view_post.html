@@ -1,59 +1,105 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{{ post.title }} • Seven33 Blog</title>
-<style>
-    :root {
-        --bg-color: #f0f0f0;
-        --text-color: #000;
-        --link-color: #007BFF;
-        --meta-color: #555;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ post.title }} | Seven33 Blog</title>
+    <meta name="description" content="{{ post.content[:150] }}...">
+    <meta name="author" content="{{ post.author }}">
+    <meta property="og:title" content="{{ post.title }}">
+    <meta property="og:description" content="{{ post.content[:150] }}...">
+    <meta property="og:type" content="article">
+    <style>
+        :root {
+            --bg-color: #f5f5f5;
+            --text-color: #222;
+            --container-bg: #fff;
+            --link-color: #007BFF;
+        }
 
-    body.dark {
-        --bg-color: #121212;
-        --text-color: #eee;
-        --link-color: #66b2ff;
-        --meta-color: #aaa;
-    }
+        body.dark {
+            --bg-color: #121212;
+            --text-color: #eee;
+            --container-bg: #1e1e1e;
+            --link-color: #66b2ff;
+        }
 
-    body { 
-        font-family: Arial, sans-serif; 
-        margin:0; padding:0; 
-        background: var(--bg-color); 
-        color: var(--text-color); 
-        transition: 0.3s; 
-    }
+        body {
+            font-family: Arial, sans-serif;
+            background: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 2rem;
+            transition: 0.3s;
+        }
 
-    .container { max-width:800px; margin:2rem auto; padding:1rem; }
-    a { color: var(--link-color); text-decoration:none; }
-    a:hover { text-decoration:underline; }
-    .meta { font-size:0.9rem; color: var(--meta-color); margin-bottom:1rem; }
-    .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; }
-    .toggle-btn { cursor:pointer; font-weight:bold; }
-</style>
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        a {
+            text-decoration: none;
+            color: var(--link-color);
+            font-weight: bold;
+            margin-left: 1rem;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: var(--container-bg);
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            margin-top: 0;
+        }
+
+        .meta {
+            color: #555;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+
+        .content {
+            line-height: 1.6;
+        }
+
+        .toggle-btn {
+            cursor: pointer;
+            font-weight: bold;
+        }
+    </style>
 </head>
 <body>
 
-<div class="container">
-    <div class="header">
-        <a href="{{ url_for('dashboard') }}">← Back to Dashboard</a>
-        <span class="toggle-btn" id="modeToggle">🌙</span>
+<header>
+    <div>
+        <a href="{{ url_for('public_home') }}">← Back to Home</a>
     </div>
+    <div>
+        <span class="toggle-btn" id="modeToggle">🌙</span>
+        <a href="{{ url_for('logout') }}">Logout</a>
+    </div>
+</header>
 
+<div class="container">
     <h1>{{ post.title }}</h1>
     <div class="meta">By {{ post.author }} | {{ post.created_at.strftime('%b %d, %Y %H:%M') }}</div>
-    <p>{{ post.content }}</p>
+    <div class="content">{{ post.content | safe }}</div>
 </div>
 
 <script>
     const toggleBtn = document.getElementById('modeToggle');
     const body = document.body;
 
-    // Load saved mode from localStorage
-    if(localStorage.getItem('mode') === 'dark'){
+    // Check saved mode in localStorage
+    if (localStorage.getItem('mode') === 'dark') {
         body.classList.add('dark');
         toggleBtn.textContent = '☀️';
     }
@@ -62,10 +108,10 @@
         body.classList.toggle('dark');
         if(body.classList.contains('dark')){
             toggleBtn.textContent = '☀️';
-            localStorage.setItem('mode','dark');
+            localStorage.setItem('mode', 'dark');
         } else {
             toggleBtn.textContent = '🌙';
-            localStorage.setItem('mode','light');
+            localStorage.setItem('mode', 'light');
         }
     });
 </script>

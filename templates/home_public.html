@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seven33 Blog - Home</title>
+    <meta name="description" content="Read latest posts on Seven33 Blog. Personal blog, tutorials, and self-improvement content.">
+    <style>
+        :root {
+            --bg-color: #f0f0f0;
+            --text-color: #222;
+            --card-bg: #fff;
+            --card-text: #000;
+            --link-color: #007BFF;
+        }
+
+        body.dark {
+            --bg-color: #121212;
+            --text-color: #eee;
+            --card-bg: #1e1e1e;
+            --card-text: #fff;
+            --link-color: #66b2ff;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 2rem;
+            transition: 0.3s;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        header h1 {
+            margin: 0;
+        }
+
+        .toggle-btn {
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .posts {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+            max-width: 800px;
+            margin: auto;
+        }
+
+        .post-card {
+            background: var(--card-bg);
+            color: var(--card-text);
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .post-card h2 {
+            margin-top: 0;
+        }
+
+        .meta {
+            font-size: 0.9rem;
+            color: #555;
+            margin-bottom: 0.5rem;
+        }
+
+        .read-more {
+            text-decoration: none;
+            color: var(--link-color);
+            font-weight: bold;
+        }
+
+        .read-more:hover {
+            text-decoration: underline;
+        }
+
+        .pagination {
+            margin-top: 2rem;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+        }
+
+        .pagination a {
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            background: var(--card-bg);
+            color: var(--link-color);
+        }
+
+        .pagination a:hover {
+            background: var(--link-color);
+            color: var(--card-bg);
+        }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Seven33 Blog</h1>
+     <div>
+        <a href="{{ url_for('dashboard') }}">← Go to Dashboard</a>
+    </div>
+    <span class="toggle-btn" id="modeToggle">🌙</span>
+</header>
+
+<div class="posts">
+    {% for post in posts.items %}
+    <div class="post-card">
+        <h2>{{ post.title }}</h2>
+        <div class="meta">By {{ post.author }} | {{ post.created_at.strftime('%b %d, %Y') }}</div>
+        <p>{{ post.content[:200] }}...</p>
+        <a class="read-more" href="{{ url_for('view_post', slug=post.slug) }}">Read More →</a>
+    </div>
+    {% else %}
+    <p>No posts yet.</p>
+    {% endfor %}
+</div>
+
+<div class="pagination">
+    {% if posts.has_prev %}
+    <a href="{{ url_for('public_home', page=posts.prev_num) }}">← Previous</a>
+    {% endif %}
+    {% if posts.has_next %}
+    <a href="{{ url_for('public_home', page=posts.next_num) }}">Next →</a>
+    {% endif %}
+</div>
+
+<script>
+    const toggleBtn = document.getElementById('modeToggle');
+    const body = document.body;
+
+    // Load saved mode
+    if (localStorage.getItem('mode') === 'dark') {
+        body.classList.add('dark');
+        toggleBtn.textContent = '☀️';
+    }
+
+    toggleBtn.addEventListener('click', () => {
+        body.classList.toggle('dark');
+        if(body.classList.contains('dark')){
+            toggleBtn.textContent = '☀️';
+            localStorage.setItem('mode', 'dark');
+        } else {
+            toggleBtn.textContent = '🌙';
+            localStorage.setItem('mode', 'light');
+        }
+    });
+</script>
+
+</body>
+</html>
+

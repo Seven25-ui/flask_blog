@@ -236,3 +236,13 @@ body.light-mode a {
 body.light-mode .btn {
     color: #fff;
 }
+
+body { font-family: Arial, sans-serif; background:#f9f9f9; color:#222; margin:0; padding:0; }
+header { background:#333; color:#fff; padding:1rem; display:flex; justify-content:space-between; }
+a { color:#007BFF; text-decoration:none; }
+.container { padding:2rem; }
+.post { background:#fff; padding:1rem; margin-bottom:1rem; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.1); }
+.post h2 { margin:0; }
+.meta { font-size:0.85rem; color:#555; margin-bottom:0.5rem; }
+.pagination { margin-top:1rem; }
+.pagination a { margin-right:1rem; }
