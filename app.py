@@ -176,6 +176,19 @@ def public_home(page=1):
     posts = Post.query.order_by(Post.created_at.desc()).paginate(page=page, per_page=5)
     return render_template('home_public.html', posts=posts)
 
+@app.route('/search')
+def search():
+    query = request.args.get('q', '')  # assuming your form has input name="q"
+    if query:
+        # search posts by title or content
+        posts = Post.query.filter(
+            (Post.title.contains(query)) | (Post.content.contains(query))
+        ).order_by(Post.created_at.desc()).all()
+    else:
+        posts = []
+
+    return render_template('search_results.html', posts=posts, query=query)
+
 # --- RUN APP ---
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Search Results | Seven33 Blog</title>
+<style>
+    :root {
+        --bg-color: #f5f5f5;
+        --text-color: #222;
+        --container-bg: #fff;
+        --link-color: #007BFF;
+    }
+
+    body.dark {
+        --bg-color: #121212;
+        --text-color: #eee;
+        --container-bg: #1e1e1e;
+        --link-color: #66b2ff;
+    }
+
+    body { font-family: Arial, sans-serif; background: var(--bg-color); color: var(--text-color); margin:0; padding:2rem; transition:0.3s; }
+    header { display:flex; justify-content:space-between; align-items:center; margin-bottom:2rem; }
+    a { text-decoration:none; color: var(--link-color); font-weight:bold; margin-left:1rem; }
+    .toggle-btn { cursor:pointer; font-weight:bold; }
+    .container { max-width:800px; margin:auto; background: var(--container-bg); padding:2rem; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.1); }
+    .post { margin-bottom:1rem; padding:1rem; background: var(--container-bg); border-radius:6px; box-shadow:0 1px 3px rgba(0,0,0,0.1); }
+    .post h2 { margin:0; }
+    .meta { font-size:0.9rem; color:#555; margin-bottom:0.5rem; }
+    .actions a { margin-right:0.5rem; color: var(--link-color); text-decoration:none; }
+    .actions a:hover { text-decoration:underline; }
+</style>
+</head>
+<body>
+<header>
+    <div><a href="{{ url_for('dashboard') }}">← Back to Dashboard</a></div>
+    <div>
+        <span class="toggle-btn" id="modeToggle">🌙</span>
+        <a href="{{ url_for('logout') }}">Logout</a>
+    </div>
+</header>
+
+<div class="container">
+    <h1>Search Results for "{{ query }}"</h1>
+    {% if posts %}
+        {% for post in posts %}
+        <div class="post">
+            <h2>{{ post.title }}</h2>
+            <div class="meta">By {{ post.author }} | {{ post.created_at.strftime('%b %d, %Y %H:%M') }}</div>
+            <div class="actions">
+                <a href="{{ url_for('edit_post', post_id=post.id) }}">Edit</a>
+                <a href="{{ url_for('delete_post', post_id=post.id) }}">Delete</a>
+                <a href="{{ url_for('view_post', slug=post.slug) }}">View</a>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <p>No posts found matching your query.</p>
+    {% endif %}
+</div>
+
+<script>
+    const toggleBtn = document.getElementById('modeToggle');
+    const body = document.body;
+    if(localStorage.getItem('mode')==='dark'){body.classList.add('dark'); toggleBtn.textContent='☀️';}
+    toggleBtn.addEventListener('click',()=>{body.classList.toggle('dark'); if(body.classList.contains('dark')){toggleBtn.textContent='☀️'; localStorage.setItem('mode','dark');}else{toggleBtn.textContent='🌙'; localStorage.setItem('mode','light');}});
+</script>
+</body>
+</html>

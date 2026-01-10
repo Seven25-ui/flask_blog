@@ -3,47 +3,45 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard • Seven33 Blog</title>
+<title>Dashboard | Seven33 Blog</title>
 <style>
-    :root {
-        --bg-color: #f0f0f0;
-        --text-color: #000;
-        --header-bg: #333;
-        --header-text: #fff;
-        --card-bg: #fff;
-        --card-text: #000;
-        --link-color: #007BFF;
-    }
+:root {
+    --bg-color: #f5f5f5;
+    --text-color: #222;
+    --container-bg: #fff;
+    --link-color: #007BFF;
+}
 
-    body.dark {
-        --bg-color: #121212;
-        --text-color: #eee;
-        --header-bg: #1f1f1f;
-        --header-text: #fff;
-        --card-bg: #1e1e1e;
-        --card-text: #fff;
-        --link-color: #66b2ff;
-    }
+body.dark {
+    --bg-color: #121212;
+    --text-color: #eee;
+    --container-bg: #1e1e1e;
+    --link-color: #66b2ff;
+}
 
-    body { font-family: Arial, sans-serif; background: var(--bg-color); color: var(--text-color); margin:0; padding:0; transition:0.3s; }
-    header { background: var(--header-bg); color: var(--header-text); padding:1rem; display:flex; justify-content:space-between; align-items:center; }
-    a { color: var(--header-text); text-decoration:none; margin-left:1rem; }
-    .container { padding:2rem; }
-    .post { background: var(--card-bg); color: var(--card-text); padding:1rem; margin-bottom:1rem; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.1); }
-    .post h2 { margin:0; }
-    .meta { font-size:0.9rem; color:#555; margin-bottom:0.5rem; }
-    .actions a { margin-right:0.5rem; text-decoration:none; color: var(--link-color); }
-    .actions a:hover { text-decoration:underline; }
-    .flash { background:#d4edda; color:#155724; padding:0.5rem 1rem; border-radius:4px; margin-bottom:1rem; }
-    .toggle-btn { cursor:pointer; font-weight:bold; margin-left:1rem; }
+body { font-family: Arial, sans-serif; background: var(--bg-color); color: var(--text-color); margin:0; padding:2rem; transition:0.3s; }
+header { display:flex; justify-content:space-between; align-items:center; margin-bottom:2rem; }
+a { text-decoration:none; color: var(--link-color); font-weight:bold; margin-left:1rem; }
+.toggle-btn { cursor:pointer; font-weight:bold; }
+.container { max-width:800px; margin:auto; background: var(--container-bg); padding:2rem; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.1); }
+.post { margin-bottom:1rem; padding:1rem; background: var(--container-bg); border-radius:6px; box-shadow:0 1px 3px rgba(0,0,0,0.1); }
+.post h2 { margin:0; }
+.meta { font-size:0.9rem; color:#555; margin-bottom:0.5rem; }
+.actions a { margin-right:0.5rem; color: var(--link-color); text-decoration:none; }
+.actions a:hover { text-decoration:underline; }
+form.search-form { display:flex; margin-bottom:1rem; }
+form.search-form input[type="text"] { flex:1; padding:0.5rem; border-radius:6px; border:1px solid #ccc; }
+form.search-form button { margin-left:0.5rem; padding:0.5rem 1rem; border:none; border-radius:6px; background: var(--link-color); color:#fff; cursor:pointer; }
 </style>
 </head>
 <body>
 
 <header>
-    <div>Dashboard</div>
     <div>
+        <span style="font-weight:bold; color:red;">Seven33</span> | 
         <a href="{{ url_for('create_post') }}">+ New Post</a>
+    </div>
+    <div>
         <span class="toggle-btn" id="modeToggle">🌙</span>
         <a href="{{ url_for('logout') }}">Logout</a>
     </div>
@@ -51,13 +49,13 @@
 
 <div class="container">
 
-    {% with messages = get_flashed_messages() %}
-      {% if messages %}
-        {% for msg in messages %}
-            <div class="flash">{{ msg }}</div>
-        {% endfor %}
-      {% endif %}
-    {% endwith %}
+    <!-- Search Form -->
+<form class="search-form" method="GET" action="{{ url_for('search') }}" style="display:flex; margin-bottom:1rem;">
+    <input type="text" name="q" placeholder="Search posts..." style="flex:1; padding:0.5rem; border-radius:6px; border:1px solid #ccc;">
+    <button type="submit" style="margin-left:0.5rem; padding:0.5rem; border:none; border-radius:6px; background: var(--link-color); color:#fff; cursor:pointer;">
+        🔍
+    </button>
+</form>
 
     {% for post in posts %}
     <div class="post">
@@ -69,8 +67,6 @@
             <a href="{{ url_for('view_post', slug=post.slug) }}">View</a>
         </div>
     </div>
-    {% else %}
-    <p>No posts yet. <a href="{{ url_for('create_post') }}">Create your first post</a>.</p>
     {% endfor %}
 
 </div>
@@ -78,12 +74,8 @@
 <script>
 const toggleBtn = document.getElementById('modeToggle');
 const body = document.body;
-if (localStorage.getItem('mode') === 'dark') { body.classList.add('dark'); toggleBtn.textContent = '☀️'; }
-toggleBtn.addEventListener('click', () => {
-    body.classList.toggle('dark');
-    if(body.classList.contains('dark')){ toggleBtn.textContent = '☀️'; localStorage.setItem('mode', 'dark'); }
-    else { toggleBtn.textContent = '🌙'; localStorage.setItem('mode', 'light'); }
-});
+if(localStorage.getItem('mode')==='dark'){body.classList.add('dark'); toggleBtn.textContent='☀️';}
+toggleBtn.addEventListener('click',()=>{body.classList.toggle('dark'); if(body.classList.contains('dark')){toggleBtn.textContent='☀️'; localStorage.setItem('mode','dark');}else{toggleBtn.textContent='🌙'; localStorage.setItem('mode','light');}});
 </script>
 
 </body>
