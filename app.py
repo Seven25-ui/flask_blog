@@ -29,8 +29,10 @@ class Post(db.Model):
     title = db.Column(db.String(200), nullable=False)
     content = db.Column(db.Text, nullable=False)
     slug = db.Column(db.String(200), unique=True, nullable=False)
-    author = db.Column(db.String(80), nullable=False)
+    author = db.Column(db.String(80), nullable=False, default="Guest")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    approved = db.Column(db.Boolean, default=False)  # new field for moderation
+    tags = db.Column(db.String(200), nullable=True)  # new field for tags
 
 # --- CREATE DB IF NOT EXISTS ---
 with app.app_context():
@@ -42,10 +44,19 @@ def make_slug(title):
     return slug.replace(" ", "-").lower()
 
 # --- ROUTES ---
-@app.route('/')
-def root_redirect():
-    return redirect(url_for('public_home'))
 
+# Public home with pagination
+@app.route('/')
+@app.route('/public')
+@app.route('/public/page/<int:page>')
+def public_home(page=1):
+    per_page = 5
+    posts = Post.query.filter_by(approved=True).order_by(Post.created_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    return render_template('home_public.html', posts=posts)
+
+# --- User registration/login/logout ---
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -85,6 +96,7 @@ def logout():
     flash("Logged out successfully!")
     return redirect(url_for('login'))
 
+# --- Admin dashboard ---
 @app.route('/dashboard')
 def dashboard():
     if not session.get('user_id'):
@@ -93,22 +105,19 @@ def dashboard():
     posts = Post.query.order_by(Post.created_at.desc()).all()
     return render_template('dashboard.html', posts=posts)
 
+# --- Create post (admin + public) ---
 @app.route('/create', methods=['GET', 'POST'])
 def create_post():
-    if not session.get('user_id'):
-        flash("Please login first!")
-        return redirect(url_for('login'))
-
-    user = User.query.get(session['user_id'])
-    if not user:
-        flash("User not found. Please login again.")
-        session.pop('user_id', None)
-        return redirect(url_for('login'))
+    user = None
+    if session.get('user_id'):
+        user = User.query.get(session['user_id'])
 
     if request.method == 'POST':
         title = request.form['title']
         content = request.form['content']
+        tags = request.form.get('tags', '')
         slug = make_slug(title)
+        author = user.username if user else request.form.get('author', 'Guest')
 
         if Post.query.filter_by(slug=slug).first():
             flash("Post with this title already exists!")
@@ -118,16 +127,19 @@ def create_post():
             title=title,
             content=content,
             slug=slug,
-            author=user.username,
+            author=author,
+            tags=tags,
+            approved=bool(user),  # auto-approved if admin, else False
             created_at=datetime.utcnow()
         )
         db.session.add(new_post)
         db.session.commit()
-        flash("Post created successfully!")
-        return redirect(url_for('dashboard'))
+        flash("Post submitted! Awaiting approval." if not user else "Post created successfully!")
+        return redirect(url_for('public_home'))
 
     return render_template('create_post.html')
 
+# --- Edit post (admin only) ---
 @app.route('/edit/<int:post_id>', methods=['GET', 'POST'])
 def edit_post(post_id):
     if not session.get('user_id'):
@@ -147,12 +159,14 @@ def edit_post(post_id):
         post.content = request.form['content']
         post.slug = make_slug(post.title)
         post.author = user.username
+        post.tags = request.form.get('tags', post.tags)
         db.session.commit()
         flash("Post updated successfully!")
         return redirect(url_for('dashboard'))
 
     return render_template('edit_post.html', post=post)
 
+# --- Delete post (admin only) ---
 @app.route('/delete/<int:post_id>')
 def delete_post(post_id):
     if not session.get('user_id'):
@@ -165,29 +179,48 @@ def delete_post(post_id):
     flash("Post deleted successfully!")
     return redirect(url_for('dashboard'))
 
+# --- View single post (approved only) ---
 @app.route('/post/<slug>')
 def view_post(slug):
-    post = Post.query.filter_by(slug=slug).first_or_404()
+    post = Post.query.filter_by(slug=slug, approved=True).first_or_404()
     return render_template('view_post.html', post=post)
 
-@app.route('/home')
-@app.route('/home/<int:page>')
-def public_home(page=1):
-    posts = Post.query.order_by(Post.created_at.desc()).paginate(page=page, per_page=5)
-    return render_template('home_public.html', posts=posts)
-
+# --- Search (approved only) ---
 @app.route('/search')
 def search():
-    query = request.args.get('q', '')  # assuming your form has input name="q"
+    query = request.args.get('q', '')
     if query:
-        # search posts by title or content
         posts = Post.query.filter(
-            (Post.title.contains(query)) | (Post.content.contains(query))
+            ((Post.title.contains(query)) | (Post.content.contains(query))) & (Post.approved==True)
         ).order_by(Post.created_at.desc()).all()
     else:
         posts = []
 
     return render_template('search_results.html', posts=posts, query=query)
+
+# --- Pending posts for approval (admin only) ---
+@app.route('/pending')
+def pending_posts():
+    if not session.get('user_id'):
+        flash("Please login first!")
+        return redirect(url_for('login'))
+
+    # Admin sees all posts where approved=False
+    posts = Post.query.filter_by(approved=False).order_by(Post.created_at.desc()).all()
+    return render_template('pending_posts.html', posts=posts)
+
+# --- Approve a post (admin only) ---
+@app.route('/approve/<int:post_id>')
+def approve_post(post_id):
+    if not session.get('user_id'):
+        flash("Please login first!")
+        return redirect(url_for('login'))
+
+    post = Post.query.get_or_404(post_id)
+    post.approved = True
+    db.session.commit()
+    flash(f"Post '{post.title}' approved!")
+    return redirect(url_for('pending_posts'))
 
 # --- RUN APP ---
 if __name__ == "__main__":
