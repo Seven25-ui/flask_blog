@@ -10,6 +10,11 @@ A simple Flask-based blog application with user authentication, post management,
 - Author and timestamp tracking for each post
 - SQLite database (stored in instance/blog.db)
 - Fully customizable templates (templates/) and static files (static/)
+- Tailwind CSS for responsive and clean UI
+- Ready for deployment on Render free tier
+
+## Live Demo
+Check the live blog deployed on Render: [Flask Blog Live](https://flask-blog-ppop.onrender.com/dashboard)
 
 ## Screenshots
 
@@ -24,26 +29,46 @@ A simple Flask-based blog application with user authentication, post management,
 
 ## Setup & Installation
 
-Clone the repository:
+1. **Clone the repository:**
 ```bash
 git clone https://github.com/Seven25-ui/flask_blog.git
 cd flask_blog
 Create a virtual environment and activate it:
 Copy code
 Bash
+# Linux / macOS / Termux
 python3 -m venv venv
-source venv/bin/activate   # Linux / macOS / Termux
-venv\Scripts\activate      # Windows
+source venv/bin/activate
+
+# Windows
+venv\Scripts\activate
 Install dependencies:
 Copy code
 Bash
-pip install flask flask_sqlalchemy werkzeug
-Run the app:
+pip install -r requirements.txt
+Run the app locally:
 Copy code
 Bash
 python app.py
-Open in browser: http://127.0.0.1:5000
+Open in browser:
+Copy code
+
+http://127.0.0.1:5000
 First time: register a user → login → access dashboard → create posts.
+Deployment on Render (Free Hosting)
+Push repo to GitHub (public or give access to Render)
+Go to Render → New → Web Service → Connect GitHub → Select flask_blog
+Runtime: Python 3.11
+Build command:
+Copy code
+Bash
+pip install -r requirements.txt
+Start command:
+Copy code
+Bash
+gunicorn app:app
+Optional: Add environment variables like SECRET_KEY if needed
+Deploy → live URL: https://flask-blog-ppop.onrender.com/dashboard
 Git Cleanup Script
 You can run clean_git.sh to compress Git history and force-push changes:
 Copy code
