@@ -52,14 +52,24 @@
                 {% endif %}
             </div>
 
-            <!-- Reactions -->
-            <div class="flex space-x-2 mt-2">
+            <!-- Reactions - uniform emoji version -->
+            <div class="flex gap-2 mt-2">
+                {% set reaction_emojis = {
+                    'like': '👍',
+                    'love': '❤️',
+                    'haha': '😂',
+                    'sad': '😢',
+                    'angry': '😡'
+                } %}
                 {% set reaction_types = ['like', 'love', 'haha', 'sad', 'angry'] %}
                 {% for r in reaction_types %}
-                    <button onclick="sendReaction({{ post.id }}, '{{ r }}')"
-                            class="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition">
-                        {{ r }}
-                        <span id="count-{{ r }}-{{ post.id }}">
+                    <button
+                        onclick="sendReaction({{ post.id }}, '{{ r }}')"
+                        class="w-12 h-12 flex flex-col items-center justify-center rounded-lg bg-gray-200 dark:bg-gray-700 text-xl hover:bg-gray-300 dark:hover:bg-gray-600 transition select-none focus:outline-none"
+                        aria-label="{{ r }}"
+                    >
+                        <span>{{ reaction_emojis[r] }}</span>
+                        <span id="count-{{ r }}-{{ post.id }}" class="text-sm mt-1">
                             {% if post.reactions %}
                                 {{ post.reactions.filter_by(type=r).count() }}
                             {% else %}
@@ -69,6 +79,8 @@
                     </button>
                 {% endfor %}
             </div>
+            <!-- End reactions -->
+
         </div>
         {% else %}
         <p class="text-gray-600 dark:text-gray-400">You haven't created any posts yet.</p>

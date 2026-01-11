@@ -16,7 +16,7 @@
         <a href="{{ url_for('dashboard') }}" class="text-blue-600 dark:text-blue-400 hover:underline">← Back to My Dashboard</a>
     </div>
     <div class="flex items-center space-x-4">
-        <span id="darkToggle" class="cursor-pointer px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition">💡</span>
+        <button id="darkToggle" class="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition">💡</button>
         <a href="{{ url_for('logout') }}" class="text-red-600 dark:text-red-400 hover:underline">Logout</a>
     </div>
 </header>
@@ -38,8 +38,11 @@ const darkToggle = document.getElementById('darkToggle');
 // Initialize dark mode
 if (localStorage.getItem('darkMode') === 'true') {
     document.documentElement.classList.add('dark');
+} else {
+    document.documentElement.classList.remove('dark');
 }
 
+// Toggle dark mode
 darkToggle.addEventListener('click', () => {
     document.documentElement.classList.toggle('dark');
     localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
