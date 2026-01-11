@@ -1,62 +1,48 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Create Post • Seven33 Blog</title>
-<style>
-    body { font-family: Arial; background:#f5f5f5; margin:0; padding:0; transition:.3s; color:#222; }
-    body.dark { background:#121212; color:#eee; }
-    header { display:flex; justify-content:space-between; align-items:center; padding:1rem; background:#333; color:#fff; }
-    a { text-decoration:none; color:#fff; margin-left:1rem; font-weight:bold; }
-    .container { max-width:800px; margin:auto; background:#fff; padding:2rem; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,.1); margin-top:2rem; }
-    body.dark .container { background:#1e1e1e; }
-    input, textarea { width:100%; padding:.5rem; margin-bottom:1rem; border-radius:4px; border:1px solid #ccc; }
-    body.dark input, body.dark textarea { background:#2b2b2b; color:#eee; border:1px solid #555; }
-    button { padding:.5rem 1rem; border:none; border-radius:4px; background:#007BFF; color:#fff; cursor:pointer; }
-    button:hover { background:#0056b3; }
-</style>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { darkMode: 'class' };
+</script>
 </head>
-<body>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
 
-<header>
+<header class="flex justify-between items-center p-4 bg-white dark:bg-gray-800 shadow">
     <div>Create Post</div>
-    <div>
-        <a href="{{ url_for('dashboard') }}">← Dashboard</a>
-        <span class="toggle-btn" id="modeToggle">🌙</span>
-        <a href="{{ url_for('logout') }}">Logout</a>
+    <div class="flex items-center space-x-4">
+        <a href="{{ url_for('dashboard') }}" class="text-blue-600 dark:text-blue-400 hover:underline">← Dashboard</a>
+        <span id="darkToggle" class="cursor-pointer px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition">💡</span>
+        <a href="{{ url_for('logout') }}" class="text-red-600 dark:text-red-400 hover:underline">Logout</a>
     </div>
 </header>
 
-<div class="container">
-    <form method="POST">
-        <input type="text" name="title" placeholder="Post Title" required>
-        <textarea name="content" placeholder="Post Content" rows="10" required></textarea>
-        <input type="text" name="tags" placeholder="Tags (comma separated, e.g., life, motivation)">
-        <button type="submit">Create Post</button>
+<div class="max-w-3xl mx-auto p-6 bg-white dark:bg-gray-800 rounded shadow mt-6 transition-colors duration-300">
+    <form method="POST" class="space-y-4">
+        <input type="text" name="title" placeholder="Post Title" required
+               class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <textarea name="content" placeholder="Post Content" rows="10" required
+                  class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+        <input type="text" name="tags" placeholder="Tags (comma separated, e.g., life, motivation)"
+               class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition">Create Post</button>
     </form>
 </div>
 
 <script>
-const toggleBtn = document.getElementById('modeToggle');
-const body = document.body;
+const darkToggle = document.getElementById('darkToggle');
 
-// Load mode from localStorage
-if (localStorage.getItem('mode') === 'dark') { 
-    body.classList.add('dark'); 
-    toggleBtn.textContent = '☀️'; 
+// Initialize dark mode based on localStorage
+if (localStorage.getItem('darkMode') === 'true') {
+    document.documentElement.classList.add('dark');
 }
 
-// Toggle dark/light mode
-toggleBtn.addEventListener('click', () => {
-    body.classList.toggle('dark');
-    if(body.classList.contains('dark')) { 
-        toggleBtn.textContent = '☀️'; 
-        localStorage.setItem('mode','dark'); 
-    } else { 
-        toggleBtn.textContent = '🌙'; 
-        localStorage.setItem('mode','light'); 
-    }
+darkToggle.addEventListener('click', () => {
+    document.documentElement.classList.toggle('dark');
+    localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
 });
 </script>
 

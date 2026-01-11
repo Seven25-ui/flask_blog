@@ -19,29 +19,96 @@ body.dark {
     --link-color: #66b2ff;
 }
 
-body { font-family: Arial, sans-serif; background: var(--bg-color); color: var(--text-color); margin:0; padding:2rem; transition:0.3s; }
-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:2rem; }
-a { text-decoration:none; color: var(--link-color); font-weight:bold; margin-left:1rem; }
+body {
+    font-family: Arial, sans-serif;
+    background: var(--bg-color);
+    color: var(--text-color);
+    margin:0;
+    padding:2rem;
+    transition:0.3s;
+}
+
+header {
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:2rem;
+}
+
+header .left,
+header .right {
+    display:flex;
+    align-items:center;
+    gap: 1rem;
+}
+
+a {
+    text-decoration:none;
+    color: var(--link-color);
+    font-weight:bold;
+}
+
 .toggle-btn { cursor:pointer; font-weight:bold; }
-.container { max-width:800px; margin:auto; background: var(--container-bg); padding:2rem; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.1); }
-.post { margin-bottom:1rem; padding:1rem; background: var(--container-bg); border-radius:6px; box-shadow:0 1px 3px rgba(0,0,0,0.1); }
+
+.container {
+    max-width:800px;
+    margin:auto;
+    background: var(--container-bg);
+    padding:2rem;
+    border-radius:8px;
+    box-shadow:0 2px 5px rgba(0,0,0,0.1);
+}
+
+.post {
+    margin-bottom:1rem;
+    padding:1rem;
+    background: var(--container-bg);
+    border-radius:6px;
+    box-shadow:0 1px 3px rgba(0,0,0,0.1);
+}
+
 .post h2 { margin:0; }
 .meta { font-size:0.9rem; color:#555; margin-bottom:0.5rem; }
 .actions a { margin-right:0.5rem; color: var(--link-color); text-decoration:none; }
 .actions a:hover { text-decoration:underline; }
-form.search-form { display:flex; margin-bottom:1rem; }
-form.search-form input[type="text"] { flex:1; padding:0.5rem; border-radius:6px; border:1px solid #ccc; }
-form.search-form button { margin-left:0.5rem; padding:0.5rem 1rem; border:none; border-radius:6px; background: var(--link-color); color:#fff; cursor:pointer; }
+
+form.search-form {
+    display:flex;
+    margin-bottom:1rem;
+}
+form.search-form input[type="text"] {
+    flex:1;
+    padding:0.5rem;
+    border-radius:6px;
+    border:1px solid #ccc;
+}
+form.search-form button {
+    margin-left:0.5rem;
+    padding:0.5rem 1rem;
+    border:none;
+    border-radius:6px;
+    background: var(--link-color);
+    color:#fff;
+    cursor:pointer;
+}
+
+/* Highlight newly approved posts */
+.post.newly-approved {
+    border: 2px solid green;
+    background: #e6ffe6;
+}
 </style>
 </head>
 <body>
 
 <header>
-    <div>
-        <span style="font-weight:bold; color:red;">Seven33</span> | 
-        <a href="{{ url_for('create_post') }}">+ New Post</a>
+    <div class="left">
+        <span style="font-weight:bold; color:red;">Seven33</span>
+        <a href="{{ url_for('create_post') }}">Create Post</a>
+        <a href="{{ url_for('pending_posts') }}">Pending Posts</a>
+        <a href="{{ url_for('my_posts') }}">My Posts</a>
     </div>
-    <div>
+    <div class="right">
         <span class="toggle-btn" id="modeToggle">🌙</span>
         <a href="{{ url_for('logout') }}">Logout</a>
     </div>
@@ -50,32 +117,56 @@ form.search-form button { margin-left:0.5rem; padding:0.5rem 1rem; border:none; 
 <div class="container">
 
     <!-- Search Form -->
-<form class="search-form" method="GET" action="{{ url_for('search') }}" style="display:flex; margin-bottom:1rem;">
-    <input type="text" name="q" placeholder="Search posts..." style="flex:1; padding:0.5rem; border-radius:6px; border:1px solid #ccc;">
-    <button type="submit" style="margin-left:0.5rem; padding:0.5rem; border:none; border-radius:6px; background: var(--link-color); color:#fff; cursor:pointer;">
-        🔍
-    </button>
-</form>
+    <form class="search-form" method="GET" action="{{ url_for('search') }}">
+        <input type="text" name="q" placeholder="Search posts...">
+        <button type="submit">🔍</button>
+    </form>
 
     {% for post in posts %}
-    <div class="post">
+    <div class="post {% if post.id in session.get('newly_approved', []) %}newly-approved{% endif %}">
         <h2>{{ post.title }}</h2>
-        <div class="meta">By {{ post.author }} | {{ post.created_at.strftime('%b %d, %Y %H:%M') }}</div>
+        <div class="meta">By {{ post.author }} | {{ post.created_at.strftime('%b %d, %Y %H:%M') }} | Status: {{ 'Approved' if post.approved else 'Pending' }}</div>
         <div class="actions">
             <a href="{{ url_for('edit_post', post_id=post.id) }}">Edit</a>
-            <a href="{{ url_for('delete_post', post_id=post.id) }}">Delete</a>
+            <a href="{{ url_for('reject_post', post_id=post.id) }}">Delete</a>
+            {% if post.approved %}
             <a href="{{ url_for('view_post', slug=post.slug) }}">View</a>
+            {% endif %}
         </div>
     </div>
+    {% else %}
+    <p>No posts yet.</p>
     {% endfor %}
+
+    <!-- Clear highlighted posts after rendering -->
+    {% set _ = session.pop('newly_approved', None) %}
 
 </div>
 
 <script>
 const toggleBtn = document.getElementById('modeToggle');
 const body = document.body;
-if(localStorage.getItem('mode')==='dark'){body.classList.add('dark'); toggleBtn.textContent='☀️';}
-toggleBtn.addEventListener('click',()=>{body.classList.toggle('dark'); if(body.classList.contains('dark')){toggleBtn.textContent='☀️'; localStorage.setItem('mode','dark');}else{toggleBtn.textContent='🌙'; localStorage.setItem('mode','light');}});
+
+// Load mode from localStorage
+if(localStorage.getItem('mode')==='dark'){
+    body.classList.add('dark');
+    toggleBtn.textContent='☀️';
+} else {
+    body.classList.remove('dark');
+    toggleBtn.textContent='🌙';
+}
+
+// Toggle dark/light mode
+toggleBtn.addEventListener('click', () => {
+    body.classList.toggle('dark');
+    if(body.classList.contains('dark')){
+        toggleBtn.textContent='☀️';
+        localStorage.setItem('mode','dark');
+    } else {
+        toggleBtn.textContent='🌙';
+        localStorage.setItem('mode','light');
+    }
+});
 </script>
 
 </body>

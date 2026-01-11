@@ -1,153 +1,49 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Edit: {{ post.title }} | Seven33 Blog</title>
-<style>
-    :root {
-        --bg-color: #f5f5f5;
-        --text-color: #222;
-        --container-bg: #fff;
-        --link-color: #007BFF;
-        --input-bg: #fff;
-        --input-border: #ccc;
-    }
-
-    body.dark {
-        --bg-color: #121212;
-        --text-color: #eee;
-        --container-bg: #1e1e1e;
-        --link-color: #66b2ff;
-        --input-bg: #2a2a2a;
-        --input-border: #555;
-    }
-
-    body {
-        font-family: Arial, sans-serif;
-        background: var(--bg-color);
-        color: var(--text-color);
-        margin:0;
-        padding:2rem;
-        transition:0.3s;
-    }
-
-    header {
-        display:flex;
-        justify-content:space-between;
-        align-items:center;
-        margin-bottom:2rem;
-    }
-
-    a {
-        text-decoration:none;
-        color: var(--link-color);
-        font-weight:bold;
-        margin-left:1rem;
-    }
-
-    .toggle-btn {
-        cursor:pointer;
-        font-weight:bold;
-    }
-
-    .container {
-        max-width: 800px;
-        margin:auto;
-        background: var(--container-bg);
-        padding:2rem;
-        border-radius:8px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-
-    h1 {
-        margin-top:0;
-        margin-bottom:1rem;
-    }
-
-    label {
-        display:block;
-        margin-bottom:0.5rem;
-        font-weight:bold;
-    }
-
-    input[type="text"], textarea {
-        width:100%;
-        padding:0.8rem;
-        margin-bottom:1rem;
-        border:1px solid var(--input-border);
-        border-radius:6px;
-        background: var(--input-bg);
-        color: var(--text-color);
-        font-size:1rem;
-        transition:0.2s;
-    }
-
-    input[type="text"]:focus, textarea:focus {
-        outline:none;
-        border-color: var(--link-color);
-    }
-
-    button {
-        padding:0.8rem 1.5rem;
-        background: var(--link-color);
-        color:#fff;
-        border:none;
-        border-radius:6px;
-        cursor:pointer;
-        font-size:1rem;
-        transition:0.2s;
-    }
-
-    button:hover {
-        background: #0056b3;
-    }
-</style>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { darkMode: 'class' };
+</script>
 </head>
-<body>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
 
-<header>
+<header class="flex justify-between items-center p-4 bg-white dark:bg-gray-800 shadow">
     <div>
-        <a href="{{ url_for('public_home') }}">← Back to Home</a>
+        <a href="{{ url_for('dashboard') }}" class="text-blue-600 dark:text-blue-400 hover:underline">← Back to My Dashboard</a>
     </div>
-    <div>
-        <span class="toggle-btn" id="modeToggle">🌙</span>
-        <a href="{{ url_for('logout') }}">Logout</a>
+    <div class="flex items-center space-x-4">
+        <span id="darkToggle" class="cursor-pointer px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition">💡</span>
+        <a href="{{ url_for('logout') }}" class="text-red-600 dark:text-red-400 hover:underline">Logout</a>
     </div>
 </header>
 
-<div class="container">
-    <h1>Edit Post</h1>
-    <form method="POST">
-        <label for="title">Title</label>
-        <input type="text" name="title" id="title" value="{{ post.title }}" required>
-
-        <label for="content">Content</label>
-        <textarea name="content" id="content" rows="10" required>{{ post.content }}</textarea>
-
-        <button type="submit">Update Post</button>
+<div class="max-w-3xl mx-auto p-6 bg-white dark:bg-gray-800 rounded shadow mt-6 transition-colors duration-300">
+    <h1 class="text-2xl font-bold mb-4">Edit Post</h1>
+    <form method="POST" class="space-y-4">
+        <input type="text" name="title" placeholder="Post Title" value="{{ post.title }}" required
+               class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <textarea name="content" placeholder="Post Content" rows="10" required
+                  class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">{{ post.content }}</textarea>
+        <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition">Update Post</button>
     </form>
 </div>
 
 <script>
-    const toggleBtn = document.getElementById('modeToggle');
-    const body = document.body;
+const darkToggle = document.getElementById('darkToggle');
 
-    if(localStorage.getItem('mode') === 'dark'){
-        body.classList.add('dark');
-        toggleBtn.textContent = '☀️';
-    }
+// Initialize dark mode
+if (localStorage.getItem('darkMode') === 'true') {
+    document.documentElement.classList.add('dark');
+}
 
-    toggleBtn.addEventListener('click', () => {
-        body.classList.toggle('dark');
-        if(body.classList.contains('dark')){
-            toggleBtn.textContent = '☀️';
-            localStorage.setItem('mode','dark');
-        } else {
-            toggleBtn.textContent = '🌙';
-            localStorage.setItem('mode','light');
-        }
-    });
+darkToggle.addEventListener('click', () => {
+    document.documentElement.classList.toggle('dark');
+    localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
+});
 </script>
 
 </body>

@@ -3,54 +3,44 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pending Posts • Seven33 Blog</title>
+<title>Pending Posts</title>
 <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100 transition duration-300">
-<header class="flex justify-between items-center p-4 bg-blue-600 text-white">
-    <div>Pending Posts</div>
-    <div>
-        <a href="{{ url_for('dashboard') }}" class="mr-4">Dashboard</a>
-        <a href="{{ url_for('logout') }}">Logout</a>
-        <button id="modeToggle" class="ml-4">🌙</button>
-    </div>
+
+<body class="bg-gray-100 text-gray-900">
+
+<header class="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 bg-white shadow">
+    <h1 class="text-xl font-bold mb-2 sm:mb-0">Pending Posts</h1>
+    <a href="{{ url_for('dashboard') }}" class="text-blue-600 font-semibold hover:underline">← Dashboard</a>
 </header>
 
 <div class="max-w-4xl mx-auto p-4">
-    {% if posts %}
-        {% for post in posts %}
-        <div class="bg-white dark:bg-gray-800 rounded shadow p-4 mb-4">
-            <h2 class="text-xl font-bold">{{ post.title }}</h2>
-            <p class="text-sm text-gray-500 dark:text-gray-400">By {{ post.author }} | {{ post.created_at.strftime('%b %d, %Y %H:%M') }}</p>
-            <p class="mt-2">{{ post.content[:200] }}{% if post.content|length > 200 %}...{% endif %}</p>
-            {% if post.tags %}
-            <p class="mt-2 text-sm text-blue-500">Tags: {{ post.tags }}</p>
-            {% endif %}
-            <div class="mt-2">
-                <a href="{{ url_for('approve_post', post_id=post.id) }}" class="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600">Approve</a>
-                <a href="{{ url_for('delete_post', post_id=post.id) }}" class="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600">Delete</a>
-            </div>
+    {% for post in posts %}
+    <div class="bg-white p-4 rounded shadow mb-4">
+        <h2 class="text-lg font-bold">{{ post.title }}</h2>
+        <p class="text-sm text-gray-500 mb-2">
+            By {{ post.author }} | {{ post.created_at.strftime('%b %d, %Y %H:%M') }}
+        </p>
+
+        <p class="mb-4 line-clamp-3 break-words">{{ post.content }}</p>
+
+        <div class="flex flex-col sm:flex-row sm:space-x-3 space-y-2 sm:space-y-0">
+            <a href="{{ url_for('approve_post', post_id=post.id) }}"
+               class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-center">
+               Approve
+            </a>
+
+            <a href="{{ url_for('reject_post', post_id=post.id) }}"
+               class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-center"
+               onclick="return confirm('Delete this post?')">
+               Reject
+            </a>
         </div>
-        {% endfor %}
+    </div>
     {% else %}
-        <p>No pending posts.</p>
-    {% endif %}
+    <p class="text-gray-600">No pending posts 🎉</p>
+    {% endfor %}
 </div>
 
-<script>
-const toggleBtn = document.getElementById('modeToggle');
-const body = document.body;
-if(localStorage.getItem('mode')==='dark'){body.classList.add('dark'); toggleBtn.textContent='☀️';}
-toggleBtn.addEventListener('click',()=>{
-    body.classList.toggle('dark');
-    if(body.classList.contains('dark')){
-        toggleBtn.textContent='☀️';
-        localStorage.setItem('mode','dark');
-    } else {
-        toggleBtn.textContent='🌙';
-        localStorage.setItem('mode','light');
-    }
-});
-</script>
 </body>
 </html>
