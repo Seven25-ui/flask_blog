@@ -3,117 +3,75 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ post.title }} | Seven33 Blog</title>
-    <meta name="description" content="{{ post.content[:150] }}...">
-    <meta name="author" content="{{ post.author }}">
-    <meta property="og:title" content="{{ post.title }}">
-    <meta property="og:description" content="{{ post.content[:150] }}...">
-    <meta property="og:type" content="article">
-    <style>
-        :root {
-            --bg-color: #f5f5f5;
-            --text-color: #222;
-            --container-bg: #fff;
-            --link-color: #007BFF;
-        }
-
-        body.dark {
-            --bg-color: #121212;
-            --text-color: #eee;
-            --container-bg: #1e1e1e;
-            --link-color: #66b2ff;
-        }
-
-        body {
-            font-family: Arial, sans-serif;
-            background: var(--bg-color);
-            color: var(--text-color);
-            margin: 0;
-            padding: 2rem;
-            transition: 0.3s;
-        }
-
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-        }
-
-        a {
-            text-decoration: none;
-            color: var(--link-color);
-            font-weight: bold;
-            margin-left: 1rem;
-        }
-
-        .container {
-            max-width: 800px;
-            margin: auto;
-            background: var(--container-bg);
-            padding: 2rem;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-
-        h1 {
-            margin-top: 0;
-        }
-
-        .meta {
-            color: #555;
-            font-size: 0.9rem;
-            margin-bottom: 1rem;
-        }
-
-        .content {
-            line-height: 1.6;
-        }
-
-        .toggle-btn {
-            cursor: pointer;
-            font-weight: bold;
-        }
-    </style>
+    <title>{{ post.title }} • Seven33</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>tailwind.config = { darkMode: 'class' };</script>
 </head>
-<body>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
 
-<header>
-    <div>
-        <a href="{{ url_for('public_home') }}">← Back to Home</a>
-    </div>
-    <div>
-        <span class="toggle-btn" id="modeToggle">🌙</span>
-        <a href="{{ url_for('logout') }}">Logout</a>
+<header class="p-4 bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-50">
+    <div class="max-w-3xl mx-auto flex justify-between items-center">
+        <a href="{{ url_for('public_home') }}" class="font-bold text-blue-600">← Back Home</a>
+        <button id="darkToggle" class="p-2 bg-gray-100 dark:bg-gray-700 rounded-full">💡</button>
     </div>
 </header>
 
-<div class="container">
-    <h1>{{ post.title }}</h1>
-    <div class="meta">By {{ post.author }} | {{ post.created_at.strftime('%b %d, %Y %H:%M') }}</div>
-    <div class="content">{{ post.content | safe }}</div>
-</div>
+<main class="max-w-3xl mx-auto p-4 py-10">
+    <article class="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700">
+        <div class="mb-6">
+            <h1 class="text-4xl font-black mb-4 leading-tight">{{ post.title }}</h1>
+            <div class="flex items-center gap-3 text-sm text-gray-500">
+                <span class="font-bold text-blue-500 uppercase">{{ post.author }}</span>
+                <span>•</span>
+                <span>{{ post.created_at.strftime('%B %d, %Y') }}</span>
+                <span>•</span>
+                <span class="bg-blue-50 dark:bg-blue-900/20 text-blue-600 px-2 py-1 rounded">⏱️ {{ get_read_time(post.content) }} min read</span>
+            </div>
+        </div>
+
+        <div class="prose dark:prose-invert max-w-none text-lg leading-relaxed mb-10">
+            {{ post.content | replace('\n', '<br>') | safe }}
+        </div>
+
+        <hr class="dark:border-gray-700 mb-8">
+
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <h3 class="font-bold text-gray-400 uppercase text-xs tracking-widest">Share this post:</h3>
+            <div class="flex gap-2">
+                <button onclick="copyLink()" class="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 px-4 py-2 rounded-xl hover:bg-blue-600 hover:text-white transition font-bold text-sm">
+                    🔗 <span id="copyText">Copy Link</span>
+                </button>
+                
+                <a href="https://www.facebook.com/sharer/sharer.php?u={{ request.url }}" target="_blank" 
+                   class="bg-[#1877F2] text-white px-4 py-2 rounded-xl font-bold text-sm hover:opacity-90 transition">
+                    Facebook
+                </a>
+
+                <a href="https://twitter.com/intent/tweet?text={{ post.title }}&url={{ request.url }}" target="_blank" 
+                   class="bg-black text-white px-4 py-2 rounded-xl font-bold text-sm hover:opacity-90 transition">
+                    X
+                </a>
+            </div>
+        </div>
+    </article>
+</main>
 
 <script>
-    const toggleBtn = document.getElementById('modeToggle');
-    const body = document.body;
-
-    // Check saved mode in localStorage
-    if (localStorage.getItem('mode') === 'dark') {
-        body.classList.add('dark');
-        toggleBtn.textContent = '☀️';
-    }
-
-    toggleBtn.addEventListener('click', () => {
-        body.classList.toggle('dark');
-        if(body.classList.contains('dark')){
-            toggleBtn.textContent = '☀️';
-            localStorage.setItem('mode', 'dark');
-        } else {
-            toggleBtn.textContent = '🌙';
-            localStorage.setItem('mode', 'light');
-        }
+function copyLink() {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url).then(() => {
+        const btnText = document.getElementById('copyText');
+        btnText.innerText = 'Copied!';
+        setTimeout(() => { btnText.innerText = 'Copy Link'; }, 2000);
     });
+}
+
+const darkToggle = document.getElementById('darkToggle');
+if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
+darkToggle.addEventListener('click', () => {
+    document.documentElement.classList.toggle('dark');
+    localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
+});
 </script>
 
 </body>

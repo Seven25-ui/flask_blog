@@ -1,159 +1,203 @@
 <!DOCTYPE html>
-<html lang="en" class="">
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Seven33 • Home</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script>
-  tailwind.config = { darkMode: 'class' };
-</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seven33 • Home</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>tailwind.config = { darkMode: 'class' };</script>
+    <style>
+        .reaction-btn { position: relative; transition: all 0.2s ease; }
+        .reaction-btn:hover { transform: translateY(-3px); }
+        .reaction-popup {
+            position: absolute; bottom: 100%; left: 0; background: white; border-radius: 50px;
+            padding: 8px 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: none; gap: 8px;
+            margin-bottom: 8px; z-index: 50;
+        }
+        .dark .reaction-popup { background: #374151; box-shadow: 0 10px 25px rgba(0,0,0,0.4); }
+        .reaction-popup.show { display: flex; animation: popIn 0.2s ease; }
+        .reaction-popup button { font-size: 28px; transition: transform 0.15s ease; }
+        .reaction-popup button:hover { transform: scale(1.3); }
+        @keyframes popIn {
+            0% { opacity: 0; transform: scale(0.8) translateY(10px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        #toast-container div { transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+    </style>
 </head>
-<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300 min-h-screen">
 
-<header class="flex flex-col sm:flex-row justify-between items-center p-4 bg-white dark:bg-gray-800 shadow">
-    <h1 class="text-xl font-bold mb-2 sm:mb-0">Seven33 Blog</h1>
-    <div class="flex items-center space-x-4">
-        <nav class="flex space-x-4">
-            {% if user %}
-                <a href="{{ url_for('my_posts') }}" class="text-green-600 dark:text-green-400 hover:underline">Back to My Dashboard</a>
-                <a href="{{ url_for('logout') }}" class="text-red-600 dark:text-red-400 hover:underline">Logout</a>
-            {% endif %}
-        </nav>
-
-        <!-- Dark Mode Toggle -->
-        <button id="darkToggle" class="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition">
-            💡
-        </button>
+<header class="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-50 border-b dark:border-gray-700">
+    <div class="max-w-4xl mx-auto p-4 flex justify-between items-center">
+        <h1 class="text-xl font-black tracking-tighter text-blue-600 dark:text-blue-400">SEVEN33</h1>
+        <div class="flex items-center space-x-4">
+            <nav class="flex space-x-4 text-sm font-medium">
+                {% if user %}
+                    <a href="{{ url_for('dashboard') }}" class="hover:text-blue-600 transition">Dashboard</a>
+                    <a href="{{ url_for('logout') }}" class="text-red-500 hover:text-red-700">Logout</a>
+                {% else %}
+                    <a href="{{ url_for('login') }}" class="hover:text-blue-600">Login</a>
+                    <a href="{{ url_for('register') }}" class="bg-blue-600 text-white px-3 py-1 rounded-md">Join</a>
+                {% endif %}
+            </nav>
+            <button id="darkToggle" class="p-2 bg-gray-100 dark:bg-gray-700 rounded-full transition">💡</button>
+        </div>
     </div>
 </header>
 
 <div class="max-w-4xl mx-auto p-4">
     {% if posts.items %}
         {% for post in posts.items %}
-        <div class="bg-white dark:bg-gray-800 p-4 rounded shadow mb-4 transition-colors duration-300">
-            <h2 class="text-lg font-bold">{{ post.title }}</h2>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                By {{ post.author }} | {{ post.created_at.strftime('%b %d, %Y %H:%M') }}
-            </p>
+        <div class="bg-white dark:bg-gray-800 p-5 sm:p-6 rounded-2xl shadow-sm mb-6 border border-gray-200 dark:border-gray-700">
+            <div class="flex items-start gap-3 mb-4">
+                {% set post_user = get_user_by_username(post.author) %}
+                <a href="{{ url_for('public_profile', username=post.author) }}" class="flex-shrink-0">
+                    {% if post_user and post_user.profile_pic and post_user.profile_pic != 'default-avatar.png' %}
+                        <img src="{{ url_for('uploaded_file', filename=post_user.profile_pic) }}" class="w-12 h-12 rounded-full object-cover ring-2 ring-gray-100 dark:ring-gray-700">
+                    {% else %}
+                        <div class="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-md">
+                            {{ post.author[0] | upper }}
+                        </div>
+                    {% endif %}
+                </a>
 
-            <p class="mb-4 line-clamp-3">{{ post.content }}</p>
-
-            <div class="flex flex-wrap gap-2">
-                {% if user and post.author == user.username %}
-                    <a href="{{ url_for('edit_post', post_id=post.id) }}"
-                       class="px-4 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">Edit</a>
-                {% endif %}
+                <div class="flex-1">
+                    <h2 class="text-xl font-bold leading-tight">{{ post.title }}</h2>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wider font-semibold">
+                        By <span class="text-blue-500">{{ post.author }}</span> 
+                        • {{ post.created_at.strftime('%b %d, %Y') }} 
+                        • <span class="text-indigo-500">⏱️ {{ get_read_time(post.content) }} min read</span>
+                    </p>
+                </div>
             </div>
 
-            <!-- Reactions (Modern Emoji Buttons) -->
-            <div class="flex space-x-2 mt-2 select-none">
-                {% set reaction_styles = {
-                    'like': 'bg-blue-100 hover:bg-blue-200 focus:bg-blue-300 text-blue-700 dark:bg-blue-700/20 dark:hover:bg-blue-700/40 dark:text-blue-300',
-                    'love': 'bg-pink-100 hover:bg-pink-200 focus:bg-pink-300 text-pink-700 dark:bg-pink-700/20 dark:hover:bg-pink-700/40 dark:text-pink-300',
-                    'haha': 'bg-yellow-100 hover:bg-yellow-200 focus:bg-yellow-300 text-yellow-700 dark:bg-yellow-700/20 dark:hover:bg-yellow-700/40 dark:text-yellow-300',
-                    'sad': 'bg-indigo-100 hover:bg-indigo-200 focus:bg-indigo-300 text-indigo-700 dark:bg-indigo-700/20 dark:hover:bg-indigo-700/40 dark:text-indigo-300',
-                    'angry': 'bg-red-100 hover:bg-red-200 focus:bg-red-300 text-red-700 dark:bg-red-700/20 dark:hover:bg-red-700/40 dark:text-red-300'
-                } %}
-                {% set reaction_emojis = {
-                    'like': '👍',
-                    'love': '❤️',
-                    'haha': '😂',
-                    'sad': '😢',
-                    'angry': '😡'
-                } %}
-                {% set reaction_labels = {
-                    'like': 'Like',
-                    'love': 'Love',
-                    'haha': 'Haha',
-                    'sad': 'Sad',
-                    'angry': 'Angry'
-                } %}
-                {% set reaction_types = ['like', 'love', 'haha', 'sad', 'angry'] %}
-
-                {% for r in reaction_types %}
-                    <button
-                        onclick="sendReaction({{ post.id }}, '{{ r }}')"
-                        class="group relative flex flex-col items-center justify-center px-3 py-2 rounded-full shadow transition
-                            {{ reaction_styles[r] }}
-                            focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-{{ 'blue' if r == 'like' else r }}-400 scale-100
-                            active:scale-90
-                            hover:shadow-lg"
-                        style="min-width: 48px;"
-                        aria-label="{{ reaction_labels[r] }}"
-                    >
-                        <span class="text-2xl transition-transform duration-150 group-active:scale-110 group-hover:scale-125">
-                            {{ reaction_emojis[r] }}
-                        </span>
-                        <span class="text-xs opacity-80 leading-tight font-medium mt-1 capitalize">
-                            {{ reaction_labels[r] }}
-                        </span>
-                        <span id="count-{{ r }}-{{ post.id }}" class="absolute -top-2 -right-2 bg-black/70 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center border border-white dark:border-gray-900 shadow
-                            {% if post.reactions and post.reactions.filter_by(type=r).count() == 0 %}hidden{% endif %}">
-                            {% if post.reactions %}
-                                {{ post.reactions.filter_by(type=r).count() }}
-                            {% else %}
-                                0
-                            {% endif %}
-                        </span>
-                    </button>
-                {% endfor %}
+            <div class="mb-4 text-gray-700 dark:text-gray-300 leading-relaxed">
+                <p id="content-{{ post.id }}">
+                    {{ post.content[:300] }}{% if post.content|length > 300 %}...
+                    <span class="text-blue-600 cursor-pointer font-bold hover:underline" onclick="toggleContent({{ post.id }})"> See More</span>
+                    {% endif %}
+                </p>
+                <p class="hidden" id="full-{{ post.id }}">
+                    {{ post.content }}
+                    <span class="text-blue-600 cursor-pointer font-bold hover:underline" onclick="toggleContent({{ post.id }})"> Show Less</span>
+                </p>
             </div>
-            <!-- End Reactions -->
 
+            <div class="pt-3 border-t dark:border-gray-700 flex flex-col gap-3">
+                <div id="summary-{{ post.id }}" class="text-sm font-medium">
+                    {% set total_r = post.reactions.count() if post.reactions else 0 %}
+                    {% if total_r > 0 %}
+                        <span class="bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full">👍❤️ {{ total_r }} reactions</span>
+                    {% endif %}
+                </div>
+
+                <div class="flex items-center select-none">
+                    {% if user %}
+                    <div class="relative">
+                        <button onmouseenter="showReactionPopup({{ post.id }})" onmouseleave="hideReactionPopup({{ post.id }})"
+                                onclick="sendReaction({{ post.id }}, 'like')"
+                                class="reaction-btn flex items-center gap-2 px-4 py-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 border border-transparent hover:border-gray-200 dark:hover:border-gray-600 transition-all">
+                            <span class="text-xl">👍</span>
+                            <span class="text-sm font-bold">Like</span>
+                        </button>
+                        <div class="reaction-popup" id="popup-{{ post.id }}" onmouseenter="showReactionPopup({{ post.id }})" onmouseleave="hideReactionPopup({{ post.id }})">
+                            <button onclick="sendReaction({{ post.id }}, 'like')">👍</button>
+                            <button onclick="sendReaction({{ post.id }}, 'love')">❤️</button>
+                            <button onclick="sendReaction({{ post.id }}, 'haha')">😂</button>
+                            <button onclick="sendReaction({{ post.id }}, 'sad')">😢</button>
+                            <button onclick="sendReaction({{ post.id }}, 'angry')">😡</button>
+                        </div>
+                    </div>
+                    {% else %}
+                        <a href="{{ url_for('login') }}" class="text-xs bg-gray-100 dark:bg-gray-800 px-4 py-2 rounded-lg font-bold hover:bg-gray-200 transition">Log in to react</a>
+                    {% endif %}
+                </div>
+            </div>
         </div>
         {% endfor %}
 
-        <!-- Pagination -->
-        <div class="flex justify-between mt-4">
+        <div class="flex justify-between items-center py-6">
             {% if posts.has_prev %}
-                <a href="{{ url_for('public_home', page=posts.prev_num) }}" class="px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600">← Previous</a>
+                <a href="{{ url_for('public_home', page=posts.prev_num) }}" class="bg-white dark:bg-gray-800 px-4 py-2 rounded-lg shadow-sm border font-bold">← Prev</a>
             {% else %}
-                <span></span>
+                <div></div>
             {% endif %}
+            <span class="text-sm font-bold bg-blue-100 dark:bg-blue-900/30 text-blue-600 px-4 py-1 rounded-full">Page {{ posts.page }} / {{ posts.pages }}</span>
             {% if posts.has_next %}
-                <a href="{{ url_for('public_home', page=posts.next_num) }}" class="px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600">Next →</a>
+                <a href="{{ url_for('public_home', page=posts.next_num) }}" class="bg-white dark:bg-gray-800 px-4 py-2 rounded-lg shadow-sm border font-bold">Next →</a>
             {% else %}
-                <span></span>
+                <div></div>
             {% endif %}
         </div>
-
     {% else %}
-        <p class="text-gray-600 dark:text-gray-400">No posts yet.</p>
+        <div class="text-center py-20 bg-white dark:bg-gray-800 rounded-3xl shadow-sm">
+            <p class="text-gray-500 font-bold text-xl">No posts found. 📝</p>
+        </div>
     {% endif %}
 </div>
 
+<div id="toast-container" class="fixed bottom-5 left-1/2 -translate-x-1/2 sm:left-auto sm:right-5 sm:translate-x-0 z-[100] flex flex-col gap-2 w-full max-w-xs px-4"></div>
+
 <script>
+function showToast(message, type = 'success') {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    const bgColor = type === 'success' ? 'bg-blue-600' : 'bg-red-600';
+    
+    toast.className = `${bgColor} text-white px-6 py-3 rounded-2xl shadow-2xl transform translate-y-10 opacity-0 flex items-center justify-center gap-3 font-bold text-sm text-center`;
+    toast.innerHTML = `<span>${type === 'success' ? '✨' : '⚠️'}</span><span>${message}</span>`;
+
+    container.appendChild(toast);
+    setTimeout(() => toast.classList.remove('translate-y-10', 'opacity-0'), 100);
+    setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-10');
+        setTimeout(() => toast.remove(), 400);
+    }, 2500);
+}
+
+function toggleContent(id){
+    document.getElementById('content-'+id).classList.toggle('hidden');
+    document.getElementById('full-'+id).classList.toggle('hidden');
+}
+
+let popupTimeout;
+function showReactionPopup(id) { 
+    clearTimeout(popupTimeout); 
+    document.getElementById('popup-'+id).classList.add('show'); 
+}
+function hideReactionPopup(id) { 
+    popupTimeout = setTimeout(() => { 
+        document.getElementById('popup-'+id).classList.remove('show'); 
+    }, 300); 
+}
+
 function sendReaction(postId, type) {
+    const emojiMap = {'like': '👍', 'love': '❤️', 'haha': '😂', 'sad': '😢', 'angry': '😡'};
     fetch(`/react/${postId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: `type=${type}`
-    }).then(res => res.json()).then(data => {
-        if(data.status === 'ok') {
-            location.reload(); // Simple reload, puwede AJAX later
-        } else {
-            alert(data.message);
-        }
+    }).then(() => {
+        sessionStorage.setItem('reacted_emoji', emojiMap[type]);
+        location.reload();
     });
 }
-</script>
 
-<script>
-  const darkToggle = document.getElementById('darkToggle');
+// Show toast after page reload if user reacted
+window.onload = () => {
+    const emoji = sessionStorage.getItem('reacted_emoji');
+    if (emoji) {
+        showToast(`You reacted with ${emoji}`);
+        sessionStorage.removeItem('reacted_emoji');
+    }
+};
 
-  // Initialize dark mode
-  if (localStorage.getItem('darkMode') === 'true') {
-    document.documentElement.classList.add('dark');
-  } else {
-    document.documentElement.classList.remove('dark');
-  }
-
-  darkToggle.addEventListener('click', () => {
+const darkToggle = document.getElementById('darkToggle');
+if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
+darkToggle.addEventListener('click', () => {
     document.documentElement.classList.toggle('dark');
     localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
-  });
+});
 </script>
-
 </body>
 </html>

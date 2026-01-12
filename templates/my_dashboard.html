@@ -1,125 +1,164 @@
 <!DOCTYPE html>
-<html lang="en" class="">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>My Dashboard</title>
+<title>Seven33 Blog - Dashboard</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
-  // Tailwind dark mode class strategy
   tailwind.config = { darkMode: 'class' };
 </script>
+<style>
+  .reaction-btn { position: relative; transition: all 0.2s ease; }
+  .reaction-btn:hover { transform: translateY(-3px); }
+  .reaction-btn.reacted { filter: brightness(1.2); }
+  .status-badge {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
+    border-radius: 12px; font-size: 0.75rem; font-weight: 600;
+  }
+  .hide-scrollbar::-webkit-scrollbar { display: none; }
+  .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  
+  /* Smooth transitions for Toast */
+  #toast-container div { transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+</style>
 </head>
-<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300 min-h-screen">
 
-<header class="flex flex-col sm:flex-row justify-between items-center p-4 bg-white dark:bg-gray-800 shadow">
-    <h1 class="text-xl font-bold mb-2 sm:mb-0">My Dashboard</h1>
-    <div class="flex items-center space-x-4">
-        <nav class="flex space-x-4">
-            <a href="{{ url_for('public_home') }}" class="text-blue-600 dark:text-blue-400 hover:underline">Home</a>
-            <a href="{{ url_for('create_post') }}" class="text-green-600 dark:text-green-400 hover:underline">New Post</a>
-            <a href="{{ url_for('logout') }}" class="text-red-600 dark:text-red-400 hover:underline">Logout</a>
-        </nav>
-
-        <!-- Dark Mode Toggle -->
-        <button id="darkToggle" class="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition">
-            💡
-        </button>
+<header class="bg-white dark:bg-gray-800 shadow sticky top-0 z-50">
+    <div class="max-w-4xl mx-auto px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-3">
+        <h1 class="text-xl font-bold tracking-tight">Seven33 <span class="text-blue-600">Blog</span></h1>
+        <div class="flex items-center w-full md:w-auto justify-between md:justify-end gap-4">
+            <nav class="flex items-center gap-3 overflow-x-auto hide-scrollbar py-1 text-sm sm:text-base">
+                <a href="{{ url_for('public_home') }}" class="whitespace-nowrap hover:text-blue-600 transition">Home</a>
+                {% if user %}
+                    <a href="{{ url_for('dashboard') }}" class="whitespace-nowrap text-blue-600 dark:text-blue-400 font-bold border-b-2 border-blue-600">Dashboard</a>
+                    <a href="{{ url_for('create_post') }}" class="whitespace-nowrap hover:text-green-600 transition">New Post</a>
+                    <a href="{{ url_for('profile_settings') }}" class="whitespace-nowrap hover:text-purple-600 transition">⚙️ Profile</a>
+                    <a href="{{ url_for('logout') }}" class="whitespace-nowrap text-red-500 hover:text-red-700 transition">Logout</a>
+                {% endif %}
+            </nav>
+            <button id="darkToggle" class="p-2 bg-gray-100 dark:bg-gray-700 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition flex-shrink-0">💡</button>
+        </div>
     </div>
 </header>
 
-<div class="max-w-4xl mx-auto p-4">
+<div class="max-w-4xl mx-auto p-4 mt-2">
+    <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-2xl shadow-lg mb-6">
+        <h2 class="text-xl sm:text-2xl font-bold mb-1">Maayong adlaw, {{ user.username }}! 👋</h2>
+        <p class="text-blue-100 text-sm sm:text-base opacity-90">
+            {% if user.is_admin %} Admin Account: Pwede nimo i-manage ang tanan posts. {% else %} Ania ang imong mga sinuwat. Padayon sa pag-create! {% endif %}
+        </p>
+    </div>
+
     {% if posts %}
-        {% set reaction_emojis = {
-            'like': '👍',
-            'love': '❤️',
-            'haha': '😂',
-            'sad': '😢',
-            'angry': '😡'
-        } %}
         {% for post in posts %}
-        <div class="bg-white dark:bg-gray-800 p-4 rounded shadow mb-4 transition-colors duration-300">
-            <h2 class="text-lg font-bold">{{ post.title }}</h2>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                By {{ post.author }} | {{ post.created_at.strftime('%b %d, %Y %H:%M') }}
-                {% if not post.approved %}<span class="text-yellow-600 dark:text-yellow-400 font-semibold">(Pending)</span>{% endif %}
-            </p>
-
-            <p class="mb-4 line-clamp-3">{{ post.content }}</p>
-
-            <div class="flex flex-wrap gap-2 mb-2">
-                {% if user.is_admin %}
-                    {% if not post.approved %}
-                        <a href="{{ url_for('approve_post', post_id=post.id) }}"
-                           class="px-4 py-1 bg-green-600 text-white rounded hover:bg-green-700">Approve</a>
-                        <a href="{{ url_for('reject_post', post_id=post.id) }}"
-                           class="px-4 py-1 bg-red-600 text-white rounded hover:bg-red-700"
-                           onclick="return confirm('Delete this post?')">Reject</a>
+        <div class="bg-white dark:bg-gray-800 p-5 sm:p-6 rounded-2xl shadow-sm mb-5 border border-gray-200 dark:border-gray-700">
+            <div class="flex items-start gap-3 mb-4">
+                {% set post_user = get_user_by_username(post.author) %}
+                <div class="flex-shrink-0">
+                    {% if post_user and post_user.profile_pic and post_user.profile_pic != 'default-avatar.png' %}
+                        <img src="{{ url_for('uploaded_file', filename=post_user.profile_pic) }}" class="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover shadow-sm">
                     {% else %}
-                        <a href="{{ url_for('edit_post', post_id=post.id) }}"
-                           class="px-4 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">Edit</a>
+                        <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-lg shadow-sm">
+                            {{ post.author[0].upper() }}
+                        </div>
                     {% endif %}
-                {% else %}
-                    {% if post.author == user.username %}
-                        <a href="{{ url_for('edit_post', post_id=post.id) }}"
-                           class="px-4 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">Edit</a>
-                    {% endif %}
-                {% endif %}
+                </div>
+
+                <div class="flex-1 min-w-0">
+                    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1">
+                        <div>
+                            <h2 class="text-lg sm:text-xl font-bold truncate">{{ post.title }}</h2>
+                            <p class="text-xs sm:text-sm text-gray-500 flex items-center gap-2">
+                                📅 {{ post.created_at.strftime('%b %d, %Y') }}
+                                <span class="text-blue-500 font-medium">⏱️ {{ get_read_time(post.content) }} min read</span>
+                            </p>
+                        </div>
+                        <div class="mt-1 sm:mt-0">
+                            {% if post.approved %}
+                                <span class="status-badge bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">✓ Published</span>
+                            {% else %}
+                                <span class="status-badge bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">⏳ Pending</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <!-- Reactions -->
-            <div class="flex space-x-2">
-                {% set reaction_types = ['like', 'love', 'haha', 'sad', 'angry'] %}
-                {% for r in reaction_types %}
-                    <button onclick="sendReaction({{ post.id }}, '{{ r }}')"
-                            class="px-2 py-1 bg-gray-200 dark:bg-gray-700 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition text-lg">
-                        {{ reaction_emojis[r] }}
-                        <span id="count-{{ r }}-{{ post.id }}">
-                            {% if post.reactions %}{{ post.reactions.filter_by(type=r).count() }}{% else %}0{% endif %}
-                        </span>
-                    </button>
-                {% endfor %}
+            <div class="mb-5 text-sm sm:text-base leading-relaxed text-gray-700 dark:text-gray-300">
+                <p id="content-{{ post.id }}">
+                    {{ post.content[:200] }}{% if post.content|length > 200 %}...
+                    <button class="text-blue-500 font-bold hover:underline" onclick="toggleContent({{ post.id }})">See More</button>
+                    {% endif %}
+                </p>
+                <p id="full-{{ post.id }}" class="hidden">
+                    {{ post.content }}
+                    <button class="text-blue-500 font-bold hover:underline" onclick="toggleContent({{ post.id }})">Show Less</button>
+                </p>
+            </div>
+
+            <div class="flex flex-wrap gap-2 pt-4 border-t dark:border-gray-700">
+                {% if user.is_admin %}
+                    {% if not post.approved %}
+                        <a href="{{ url_for('approve_post', post_id=post.id) }}" class="flex-1 text-center sm:flex-none px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-bold transition shadow-sm" onclick="sessionStorage.setItem('action', 'approved')">Approve</a>
+                        <a href="{{ url_for('reject_post', post_id=post.id) }}" class="flex-1 text-center sm:flex-none px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-bold transition shadow-sm" onclick="return confirm('Reject this post?'); sessionStorage.setItem('action', 'rejected')">Reject</a>
+                    {% endif %}
+                {% endif %}
+
+                {% if post.author == user.username or user.is_admin %}
+                    <a href="{{ url_for('edit_post', post_id=post.id) }}" class="flex-1 text-center sm:flex-none px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold transition shadow-sm">✏️ Edit</a>
+                {% endif %}
             </div>
         </div>
         {% endfor %}
     {% else %}
-        <p class="text-gray-600 dark:text-gray-400">No posts yet. 
-            <a href="{{ url_for('create_post') }}" class="text-blue-600 dark:text-blue-400 hover:underline">Create your first post!</a>
-        </p>
+        <div class="bg-white dark:bg-gray-800 p-10 rounded-2xl shadow text-center">
+            <p class="text-gray-500 mb-4">Wala pa kayo'y post. Sugdi na!</p>
+            <a href="{{ url_for('create_post') }}" class="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold shadow-lg">✨ Create Post</a>
+        </div>
     {% endif %}
 </div>
 
+<div id="toast-container" class="fixed bottom-5 right-5 z-[100] flex flex-col gap-2"></div>
+
 <script>
-function sendReaction(postId, type) {
-    fetch(`/react/${postId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `type=${type}`
-    }).then(res => res.json()).then(data => {
-        if(data.status === 'ok') {
-            location.reload(); // puwede i-improve later to update counts without reload
-        } else {
-            alert(data.message);
-        }
+    // TOAST SYSTEM
+    function showToast(message, type = 'success') {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        const bgColor = type === 'success' ? 'bg-green-600' : (type === 'error' ? 'bg-red-600' : 'bg-blue-600');
+        
+        toast.className = `${bgColor} text-white px-6 py-3 rounded-xl shadow-2xl transform translate-y-10 opacity-0 flex items-center gap-3 font-bold`;
+        toast.innerHTML = `<span>${type === 'success' ? '✅' : 'ℹ️'}</span><span>${message}</span>`;
+
+        container.appendChild(toast);
+        setTimeout(() => toast.classList.remove('translate-y-10', 'opacity-0'), 100);
+        setTimeout(() => {
+            toast.classList.add('opacity-0', 'translate-y-10');
+            setTimeout(() => toast.remove(), 400);
+        }, 3000);
+    }
+
+    // Check for actions after page reload
+    window.onload = () => {
+        const action = sessionStorage.getItem('action');
+        if (action === 'approved') showToast('Post successfully published!');
+        if (action === 'rejected') showToast('Post has been removed.', 'error');
+        sessionStorage.removeItem('action');
+    };
+
+    function toggleContent(id) {
+        document.getElementById('content-'+id).classList.toggle('hidden');
+        document.getElementById('full-'+id).classList.toggle('hidden');
+    }
+
+    const darkToggle = document.getElementById('darkToggle');
+    if(localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
+    darkToggle.addEventListener('click', () => {
+        document.documentElement.classList.toggle('dark');
+        localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
     });
-}
-
-// Dark mode toggle
-const darkToggle = document.getElementById('darkToggle');
-
-// Initialize dark mode from localStorage
-if (localStorage.getItem('darkMode') === 'true') {
-    document.documentElement.classList.add('dark');
-} else {
-    document.documentElement.classList.remove('dark');
-}
-
-// Toggle dark mode and save preference
-darkToggle.addEventListener('click', () => {
-    document.documentElement.classList.toggle('dark');
-    localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
-});
 </script>
-
 </body>
 </html>
