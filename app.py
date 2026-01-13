@@ -18,13 +18,14 @@ cloudinary_url = os.environ.get('CLOUDINARY_URL')
 if cloudinary_url:
     cloudinary.config(cloudinary_url=cloudinary_url, secure=True)
 
-# --- DATABASE CONFIG ---
+# --- DATABASE CONFIG (POSTGRES) ---
 if os.environ.get('DATABASE_URL'):
     database_url = os.environ.get('DATABASE_URL')
     if database_url.startswith("postgres://"):
         database_url = database_url.replace("postgres://", "postgresql://", 1)
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 else:
+    # Local fallback only
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(app.instance_path, 'blog.db')
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -55,14 +56,28 @@ class Reaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    type = db.Column(db.String(20), nullable=False) # 'like' or 'love'
+    type = db.Column(db.String(20), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     post = db.relationship('Post', backref=db.backref('reactions', lazy='dynamic'))
     user = db.relationship('User', backref=db.backref('reactions', lazy='dynamic'))
 
-# --- DATABASE INITIALIZATION ---
+# --- DATABASE INITIALIZATION & AUTO-ADMIN ---
 with app.app_context():
     db.create_all()
+    
+    # EMERGENCY AUTO-ADMIN: If the DB is empty or reset, create 'admin'
+    admin_check = User.query.filter_by(username="admin").first()
+    if not admin_check:
+        hashed_pw = generate_password_hash("admin733") # Use this password to login
+        new_admin = User(
+            username="admin", 
+            password=hashed_pw, 
+            is_admin=True,
+            bio="The Creator of Seven33"
+        )
+        db.session.add(new_admin)
+        db.session.commit()
+        print(">>> [SYSTEM] Postgres Admin Created: User: admin | Pass: admin733")
 
 # --- HELPERS ---
 def make_slug(title):
@@ -100,11 +115,10 @@ def register():
     if request.method == 'POST':
         username = request.form['username']
         if User.query.filter_by(username=username).first():
-            flash("Username already exists. Please choose another.")
+            flash("Username already exists.")
             return redirect(url_for('register'))
         hashed_pw = generate_password_hash(request.form['password'])
-        is_admin = not User.query.first()
-        db.session.add(User(username=username, password=hashed_pw, is_admin=is_admin))
+        db.session.add(User(username=username, password=hashed_pw, is_admin=False))
         db.session.commit()
         flash("Registration successful! Please sign in.")
         return redirect(url_for('login'))
@@ -117,7 +131,7 @@ def login():
         if user and check_password_hash(user.password, request.form['password']):
             session['user_id'] = user.id
             return redirect(url_for('dashboard'))
-        flash("Invalid username or password.")
+        flash("Invalid credentials.")
     return render_template('login.html')
 
 @app.route('/dashboard')
@@ -160,64 +174,24 @@ def create_post():
         db.session.add(post)
         db.session.commit()
         
-        if user.is_admin:
-            flash("Post published successfully!")
-        else:
-            flash("Post submitted! Waiting for admin approval.")
-            
+        flash("Post submitted!")
         return redirect(url_for('dashboard'))
     return render_template('create_post.html', post=None)
 
-# --- REACTION API ---
 @app.route('/react/<int:post_id>/<type>', methods=['POST'])
 def react(post_id, type):
     if not session.get('user_id'):
-        return jsonify({'error': 'Login required'}), 401
-    
+        return jsonify({'error': 'Unauthorized'}), 401
     user_id = session['user_id']
-    # Check if this specific reaction exists
     existing = Reaction.query.filter_by(post_id=post_id, user_id=user_id, type=type).first()
-    
     if existing:
-        db.session.delete(existing) # Toggle off
-        status = "removed"
+        db.session.delete(existing)
     else:
-        # Optional: Delete other types so user only has one reaction per post
         Reaction.query.filter_by(post_id=post_id, user_id=user_id).delete()
-        new_reaction = Reaction(post_id=post_id, user_id=user_id, type=type)
-        db.session.add(new_reaction)
-        status = "added"
-    
+        db.session.add(Reaction(post_id=post_id, user_id=user_id, type=type))
     db.session.commit()
-    
-    # Get updated counts
     count = Reaction.query.filter_by(post_id=post_id, type=type).count()
-    return jsonify({'count': count, 'status': status, 'type': type})
-
-# --- ADMIN ROUTES ---
-@app.route('/approve/<int:post_id>')
-@login_required
-def approve_post(post_id):
-    user = db.session.get(User, session['user_id'])
-    if user.is_admin:
-        post = db.session.get(Post, post_id)
-        if post:
-            post.approved = True
-            db.session.commit()
-            flash("Post approved.")
-    return redirect(url_for('dashboard'))
-
-@app.route('/reject/<int:post_id>')
-@login_required
-def reject_post(post_id):
-    user = db.session.get(User, session['user_id'])
-    if user.is_admin:
-        post = db.session.get(Post, post_id)
-        if post:
-            db.session.delete(post)
-            db.session.commit()
-            flash("Post rejected.")
-    return redirect(url_for('dashboard'))
+    return jsonify({'count': count, 'type': type})
 
 @app.route('/edit/<int:post_id>', methods=['GET', 'POST'])
 @login_required
@@ -230,7 +204,7 @@ def edit_post(post_id):
         post.title = request.form.get('title')
         post.content = request.form.get('content')
         db.session.commit()
-        flash("Post updated successfully!")
+        flash("Post updated!")
         return redirect(url_for('dashboard'))
     return render_template('create_post.html', post=post)
 
@@ -242,7 +216,7 @@ def delete_post(post_id):
     if post and (post.author == user.username or user.is_admin):
         db.session.delete(post)
         db.session.commit()
-        flash("Post deleted successfully.")
+        flash("Post deleted.")
     return redirect(url_for('dashboard'))
 
 @app.route('/post/<slug>')
@@ -263,14 +237,14 @@ def profile_settings():
                 res = cloudinary.uploader.upload(file)
                 user.profile_pic = res.get('secure_url')
         db.session.commit()
-        flash("Profile updated successfully!")
+        flash("Profile updated!")
         return redirect(url_for('dashboard'))
     return render_template('profile_settings.html', user=user)
 
 @app.route('/logout')
 def logout():
     session.clear()
-    flash("You have been logged out.")
+    flash("Logged out.")
     return redirect(url_for('login'))
 
 if __name__ == "__main__":
