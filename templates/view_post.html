@@ -7,71 +7,85 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script>tailwind.config = { darkMode: 'class' };</script>
 </head>
-<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300 min-h-screen">
 
-<header class="p-4 bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-50">
-    <div class="max-w-3xl mx-auto flex justify-between items-center">
-        <a href="{{ url_for('public_home') }}" class="font-bold text-blue-600">← Back Home</a>
-        <button id="darkToggle" class="p-2 bg-gray-100 dark:bg-gray-700 rounded-full">💡</button>
+<header class="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-50 border-b dark:border-gray-700">
+    <div class="max-w-3xl mx-auto p-4 flex justify-between items-center">
+        <a href="{{ url_for('public_home') }}" class="text-blue-600 font-bold flex items-center gap-2 hover:underline">
+            <span class="text-xl">←</span> Back
+        </a>
+        
+        <div class="flex items-center gap-4">
+            <button id="darkToggle" class="p-2 bg-gray-100 dark:bg-gray-700 rounded-full transition">💡</button>
+            <h1 class="text-lg font-black tracking-tighter text-gray-400">SEVEN33</h1>
+        </div>
     </div>
 </header>
 
-<main class="max-w-3xl mx-auto p-4 py-10">
-    <article class="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700">
-        <div class="mb-6">
-            <h1 class="text-4xl font-black mb-4 leading-tight">{{ post.title }}</h1>
-            <div class="flex items-center gap-3 text-sm text-gray-500">
-                <span class="font-bold text-blue-500 uppercase">{{ post.author }}</span>
-                <span>•</span>
-                <span>{{ post.created_at.strftime('%B %d, %Y') }}</span>
-                <span>•</span>
-                <span class="bg-blue-50 dark:bg-blue-900/20 text-blue-600 px-2 py-1 rounded">⏱️ {{ get_read_time(post.content) }} min read</span>
+<main class="max-w-3xl mx-auto p-4 sm:p-8 mt-4">
+    <article class="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+        
+        <div class="p-6 sm:p-10 pb-4">
+            <h1 class="text-3xl sm:text-4xl font-extrabold leading-tight mb-4">{{ post.title }}</h1>
+            
+            <div class="flex items-center gap-3 py-4 border-y border-gray-50 dark:border-gray-700/50">
+                {% set author = get_user_by_username(post.author) %}
+                <img src="{{ url_for('uploaded_file', filename=author.profile_pic if author else 'default-avatar.png') }}"
+                     onerror="this.src='https://ui-avatars.com/api/?name={{ post.author }}&background=0D8ABC&color=fff'"
+                     class="w-12 h-12 rounded-full object-cover ring-2 ring-gray-100 dark:ring-gray-700 shadow-sm">
+                <div>
+                    <p class="font-bold text-blue-600">{{ post.author }}</p>
+                    <p class="text-xs text-gray-500">{{ post.created_at.strftime('%B %d, %Y') }} • {{ get_read_time(post.content) }} min read</p>
+                </div>
             </div>
         </div>
 
-        <div class="prose dark:prose-invert max-w-none text-lg leading-relaxed mb-10">
-            {{ post.content | replace('\n', '<br>') | safe }}
+        {% if post.media_file %}
+        <div class="w-full bg-gray-100 dark:bg-gray-900 border-b dark:border-gray-700">
+            {% if post.media_type == 'image' %}
+                <img src="{{ url_for('uploaded_file', filename=post.media_file) }}" class="w-full h-auto max-h-[700px] object-contain mx-auto">
+            {% elif post.media_type == 'video' %}
+                <video controls class="w-full shadow-inner">
+                    <source src="{{ url_for('uploaded_file', filename=post.media_file) }}" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+            {% endif %}
         </div>
+        {% endif %}
 
-        <hr class="dark:border-gray-700 mb-8">
-
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <h3 class="font-bold text-gray-400 uppercase text-xs tracking-widest">Share this post:</h3>
-            <div class="flex gap-2">
-                <button onclick="copyLink()" class="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 px-4 py-2 rounded-xl hover:bg-blue-600 hover:text-white transition font-bold text-sm">
-                    🔗 <span id="copyText">Copy Link</span>
-                </button>
-                
-                <a href="https://www.facebook.com/sharer/sharer.php?u={{ request.url }}" target="_blank" 
-                   class="bg-[#1877F2] text-white px-4 py-2 rounded-xl font-bold text-sm hover:opacity-90 transition">
-                    Facebook
-                </a>
-
-                <a href="https://twitter.com/intent/tweet?text={{ post.title }}&url={{ request.url }}" target="_blank" 
-                   class="bg-black text-white px-4 py-2 rounded-xl font-bold text-sm hover:opacity-90 transition">
-                    X
-                </a>
+        <div class="p-6 sm:p-10 pt-8 text-lg leading-relaxed text-gray-700 dark:text-gray-300">
+            <div class="whitespace-pre-wrap">{{ post.content | safe }}</div>
+            
+            {% if post.tags %}
+            <div class="mt-10 flex flex-wrap gap-2">
+                {% for tag in post.tags.split(',') %}
+                    <span class="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-full text-sm font-semibold">
+                        #{{ tag.strip() }}
+                    </span>
+                {% endfor %}
             </div>
+            {% endif %}
         </div>
     </article>
 </main>
 
-<script>
-function copyLink() {
-    const url = window.location.href;
-    navigator.clipboard.writeText(url).then(() => {
-        const btnText = document.getElementById('copyText');
-        btnText.innerText = 'Copied!';
-        setTimeout(() => { btnText.innerText = 'Copy Link'; }, 2000);
-    });
-}
+<footer class="text-center py-10 text-gray-400 text-sm">
+    &copy; 2026 Seven33 Blog. All rights reserved.
+</footer>
 
-const darkToggle = document.getElementById('darkToggle');
-if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
-darkToggle.addEventListener('click', () => {
-    document.documentElement.classList.toggle('dark');
-    localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
-});
+<script>
+    const darkToggle = document.getElementById('darkToggle');
+    
+    // Check if darkMode was already active
+    if (localStorage.getItem('darkMode') === 'true') {
+        document.documentElement.classList.add('dark');
+    }
+
+    darkToggle.addEventListener('click', () => {
+        document.documentElement.classList.toggle('dark');
+        // Save the setting to localStorage
+        localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
+    });
 </script>
 
 </body>

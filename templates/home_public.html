@@ -23,6 +23,7 @@
             100% { opacity: 1; transform: scale(1) translateY(0); }
         }
         #toast-container div { transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        video { max-height: 500px; background: black; }
     </style>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300 min-h-screen">
@@ -32,6 +33,7 @@
         <h1 class="text-xl font-black tracking-tighter text-blue-600 dark:text-blue-400">SEVEN33</h1>
         <div class="flex items-center space-x-4">
             <nav class="flex space-x-4 text-sm font-medium">
+                <a href="{{ url_for('public_home') }}" class="hover:text-blue-600">Home</a>
                 {% if user %}
                     <a href="{{ url_for('dashboard') }}" class="hover:text-blue-600 transition">Dashboard</a>
                     <a href="{{ url_for('logout') }}" class="text-red-500 hover:text-red-700">Logout</a>
@@ -48,46 +50,65 @@
 <div class="max-w-4xl mx-auto p-4">
     {% if posts.items %}
         {% for post in posts.items %}
-        <div class="bg-white dark:bg-gray-800 p-5 sm:p-6 rounded-2xl shadow-sm mb-6 border border-gray-200 dark:border-gray-700">
-            <div class="flex items-start gap-3 mb-4">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm mb-6 border border-gray-200 dark:border-gray-700 overflow-hidden">
+
+            <div class="p-5 sm:p-6 pb-2 flex items-start gap-3">
                 {% set post_user = get_user_by_username(post.author) %}
-                <a href="{{ url_for('public_profile', username=post.author) }}" class="flex-shrink-0">
-                    {% if post_user and post_user.profile_pic and post_user.profile_pic != 'default-avatar.png' %}
-                        <img src="{{ url_for('uploaded_file', filename=post_user.profile_pic) }}" class="w-12 h-12 rounded-full object-cover ring-2 ring-gray-100 dark:ring-gray-700">
-                    {% else %}
-                        <div class="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-md">
-                            {{ post.author[0] | upper }}
-                        </div>
-                    {% endif %}
-                </a>
+                <div class="flex-shrink-0">
+                    <a href="{{ url_for('public_profile', username=post.author) }}">
+                        <img src="{{ url_for('uploaded_file', filename=post_user.profile_pic if post_user else 'default-avatar.png') }}"
+                             onerror="this.src='https://ui-avatars.com/api/?name={{ post.author }}&background=0D8ABC&color=fff'"
+                             class="w-12 h-12 rounded-full object-cover ring-2 ring-gray-100 dark:ring-gray-700 shadow-sm hover:opacity-80 transition">
+                    </a>
+                </div>
 
                 <div class="flex-1">
-                    <h2 class="text-xl font-bold leading-tight">{{ post.title }}</h2>
+                    <h2 class="text-xl font-bold leading-tight">
+                        <a href="{{ url_for('view_post', slug=post.slug) }}" class="hover:text-blue-600 transition">
+                            {{ post.title }}
+                        </a>
+                    </h2>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wider font-semibold">
-                        By <span class="text-blue-500">{{ post.author }}</span> 
-                        • {{ post.created_at.strftime('%b %d, %Y') }} 
+                        By 
+                        <a href="{{ url_for('public_profile', username=post.author) }}" class="text-blue-500 hover:underline">
+                            {{ post.author }}
+                        </a>
+                        • {{ post.created_at.strftime('%b %d, %Y') }}
                         • <span class="text-indigo-500">⏱️ {{ get_read_time(post.content) }} min read</span>
                     </p>
                 </div>
             </div>
 
-            <div class="mb-4 text-gray-700 dark:text-gray-300 leading-relaxed">
-                <p id="content-{{ post.id }}">
-                    {{ post.content[:300] }}{% if post.content|length > 300 %}...
+            {% if post.media_file %}
+            <div class="mt-2 border-y dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+                {% if post.media_type == 'image' %}
+                    <img src="{{ url_for('uploaded_file', filename=post.media_file) }}" class="w-full h-auto max-h-[600px] object-contain mx-auto">
+                {% elif post.media_type == 'video' %}
+                    <video controls class="w-full">
+                        <source src="{{ url_for('uploaded_file', filename=post.media_file) }}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <div class="px-5 sm:px-6 py-4 text-gray-700 dark:text-gray-300 leading-relaxed">
+                <div id="content-{{ post.id }}">
+                    {{ post.content[:250] | safe }}{% if post.content|length > 250 %}...
                     <span class="text-blue-600 cursor-pointer font-bold hover:underline" onclick="toggleContent({{ post.id }})"> See More</span>
                     {% endif %}
-                </p>
-                <p class="hidden" id="full-{{ post.id }}">
-                    {{ post.content }}
+                </div>
+                <div class="hidden" id="full-{{ post.id }}">
+                    {{ post.content | safe }}
                     <span class="text-blue-600 cursor-pointer font-bold hover:underline" onclick="toggleContent({{ post.id }})"> Show Less</span>
-                </p>
+                </div>
             </div>
 
-            <div class="pt-3 border-t dark:border-gray-700 flex flex-col gap-3">
+            <div class="px-5 py-4 bg-gray-50/50 dark:bg-gray-800/50 border-t dark:border-gray-700 flex flex-col gap-3">
                 <div id="summary-{{ post.id }}" class="text-sm font-medium">
                     {% set total_r = post.reactions.count() if post.reactions else 0 %}
                     {% if total_r > 0 %}
-                        <span class="bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full">👍❤️ {{ total_r }} reactions</span>
+                        <span class="bg-white dark:bg-gray-700 px-3 py-1 rounded-full shadow-sm border dark:border-gray-600">👍❤️ {{ total_r }} reactions</span>
                     {% endif %}
                 </div>
 
@@ -96,7 +117,7 @@
                     <div class="relative">
                         <button onmouseenter="showReactionPopup({{ post.id }})" onmouseleave="hideReactionPopup({{ post.id }})"
                                 onclick="sendReaction({{ post.id }}, 'like')"
-                                class="reaction-btn flex items-center gap-2 px-4 py-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 border border-transparent hover:border-gray-200 dark:hover:border-gray-600 transition-all">
+                                class="reaction-btn flex items-center gap-2 px-4 py-2 rounded-xl hover:bg-white dark:hover:bg-gray-700 shadow-sm border border-gray-200 dark:border-gray-600 transition-all">
                             <span class="text-xl">👍</span>
                             <span class="text-sm font-bold">Like</span>
                         </button>
@@ -109,44 +130,25 @@
                         </div>
                     </div>
                     {% else %}
-                        <a href="{{ url_for('login') }}" class="text-xs bg-gray-100 dark:bg-gray-800 px-4 py-2 rounded-lg font-bold hover:bg-gray-200 transition">Log in to react</a>
+                        <a href="{{ url_for('login') }}" class="text-xs bg-gray-200 dark:bg-gray-700 px-4 py-2 rounded-lg font-bold hover:bg-gray-300 transition">Log in to react</a>
                     {% endif %}
                 </div>
             </div>
         </div>
         {% endfor %}
-
-        <div class="flex justify-between items-center py-6">
-            {% if posts.has_prev %}
-                <a href="{{ url_for('public_home', page=posts.prev_num) }}" class="bg-white dark:bg-gray-800 px-4 py-2 rounded-lg shadow-sm border font-bold">← Prev</a>
-            {% else %}
-                <div></div>
-            {% endif %}
-            <span class="text-sm font-bold bg-blue-100 dark:bg-blue-900/30 text-blue-600 px-4 py-1 rounded-full">Page {{ posts.page }} / {{ posts.pages }}</span>
-            {% if posts.has_next %}
-                <a href="{{ url_for('public_home', page=posts.next_num) }}" class="bg-white dark:bg-gray-800 px-4 py-2 rounded-lg shadow-sm border font-bold">Next →</a>
-            {% else %}
-                <div></div>
-            {% endif %}
-        </div>
-    {% else %}
-        <div class="text-center py-20 bg-white dark:bg-gray-800 rounded-3xl shadow-sm">
-            <p class="text-gray-500 font-bold text-xl">No posts found. 📝</p>
-        </div>
-    {% endif %}
+        {% endif %}
 </div>
 
 <div id="toast-container" class="fixed bottom-5 left-1/2 -translate-x-1/2 sm:left-auto sm:right-5 sm:translate-x-0 z-[100] flex flex-col gap-2 w-full max-w-xs px-4"></div>
 
 <script>
+// ... (All scripts from your original file)
 function showToast(message, type = 'success') {
     const container = document.getElementById('toast-container');
     const toast = document.createElement('div');
     const bgColor = type === 'success' ? 'bg-blue-600' : 'bg-red-600';
-    
-    toast.className = `${bgColor} text-white px-6 py-3 rounded-2xl shadow-2xl transform translate-y-10 opacity-0 flex items-center justify-center gap-3 font-bold text-sm text-center`;
-    toast.innerHTML = `<span>${type === 'success' ? '✨' : '⚠️'}</span><span>${message}</span>`;
-
+    toast.className = `${bgColor} text-white px-6 py-3 rounded-2xl shadow-2xl transform translate-y-10 opacity-0 flex items-center justify-center gap-3 font-bold text-sm text-center transition-all duration-300`;
+    toast.innerHTML = `<span>${type === 'success' ? ' ✨' : '⚠️'}</span><span>${message}</span>`;
     container.appendChild(toast);
     setTimeout(() => toast.classList.remove('translate-y-10', 'opacity-0'), 100);
     setTimeout(() => {
@@ -161,14 +163,15 @@ function toggleContent(id){
 }
 
 let popupTimeout;
-function showReactionPopup(id) { 
-    clearTimeout(popupTimeout); 
-    document.getElementById('popup-'+id).classList.add('show'); 
+function showReactionPopup(id) {
+    clearTimeout(popupTimeout);
+    document.getElementById('popup-'+id).classList.add('show');
 }
-function hideReactionPopup(id) { 
-    popupTimeout = setTimeout(() => { 
-        document.getElementById('popup-'+id).classList.remove('show'); 
-    }, 300); 
+function hideReactionPopup(id) {
+    popupTimeout = setTimeout(() => {
+        const popup = document.getElementById('popup-'+id);
+        if(popup) popup.classList.remove('show');
+    }, 300);
 }
 
 function sendReaction(postId, type) {
@@ -183,7 +186,6 @@ function sendReaction(postId, type) {
     });
 }
 
-// Show toast after page reload if user reacted
 window.onload = () => {
     const emoji = sessionStorage.getItem('reacted_emoji');
     if (emoji) {

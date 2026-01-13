@@ -18,11 +18,12 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(app.instance
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
+# --- FILE UPLOAD CONFIG ---
 UPLOAD_FOLDER = os.path.join(app.instance_path, 'uploads')
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'mp4', 'mov', 'webm'}
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
+app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024  # 20MB
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -45,6 +46,8 @@ class Post(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     approved = db.Column(db.Boolean, default=False)
     tags = db.Column(db.String(200), nullable=True)
+    media_file = db.Column(db.String(200), nullable=True)
+    media_type = db.Column(db.String(10), nullable=True) # 'image' or 'video'
 
 class Reaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -63,24 +66,22 @@ def make_slug(title):
     slug = re.sub(r'[^a-zA-Z0-9 ]', '', title)
     return slug.replace(" ", "-").lower()
 
-def admin_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        user_id = session.get('user_id')
-        if not user_id: return redirect(url_for('login'))
-        user = User.query.get(user_id)
-        if not user or not user.is_admin:
-            flash("Admin access required!")
-            return redirect(url_for('public_home'))
-        return f(*args, **kwargs)
-    return decorated
-
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         if not session.get('user_id'):
             flash("Please login first!")
             return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated
+
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        user = User.query.get(session.get('user_id'))
+        if not user or not user.is_admin:
+            flash("Admin access required!")
+            return redirect(url_for('public_home'))
         return f(*args, **kwargs)
     return decorated
 
@@ -107,15 +108,20 @@ def public_home(page=1):
     user = User.query.get(session['user_id']) if session.get('user_id') else None
     return render_template('home_public.html', posts=posts, user=user)
 
+@app.route('/profile/<username>')
+def public_profile(username):
+    user_profile = User.query.filter_by(username=username).first_or_404()
+    posts = Post.query.filter_by(author=username, approved=True).order_by(Post.created_at.desc()).all()
+    return render_template('public_profile.html', user_profile=user_profile, posts=posts)
+
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
         username = request.form['username']
-        password = request.form['password']
         if User.query.filter_by(username=username).first():
             flash("Username exists!")
             return redirect(url_for('register'))
-        hashed_pw = generate_password_hash(password)
+        hashed_pw = generate_password_hash(request.form['password'])
         is_admin = not User.query.first()
         db.session.add(User(username=username, password=hashed_pw, is_admin=is_admin))
         db.session.commit()
@@ -144,52 +150,48 @@ def create_post():
     if request.method == 'POST':
         title = request.form['title']
         content = request.form['content']
+        tags = request.form.get('tags', '')
         slug = make_slug(title)
-        if Post.query.filter_by(slug=slug).first():
-            flash("Slug already exists!")
-            return redirect(url_for('create_post'))
-        post = Post(title=title, content=content, slug=slug, author=user.username, approved=user.is_admin)
+        filename = None
+        m_type = None
+        if 'media_file' in request.files:
+            file = request.files['media_file']
+            if file and file.filename != '':
+                ext = file.filename.rsplit('.', 1)[1].lower()
+                filename = f"{uuid.uuid4().hex}.{ext}"
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                m_type = 'video' if ext in ['mp4', 'mov', 'webm'] else 'image'
+        post = Post(title=title, content=content, slug=slug, author=user.username,
+                    approved=user.is_admin, tags=tags, media_file=filename, media_type=m_type)
         db.session.add(post)
         db.session.commit()
         flash("Post submitted!")
         return redirect(url_for('dashboard'))
-    return render_template('create_post.html')
-
-@app.route('/post/<slug>')
-def view_post(slug):
-    post = Post.query.filter_by(slug=slug, approved=True).first_or_404()
-    return render_template('view_post.html', post=post)
-
-@app.route('/dashboard')
-@login_required
-def dashboard():
-    user = User.query.get(session['user_id'])
-    if user.is_admin:
-        posts = Post.query.order_by(Post.created_at.desc()).all()
-    else:
-        posts = Post.query.filter_by(author=user.username).order_by(Post.created_at.desc()).all()
-    return render_template('my_dashboard.html', posts=posts, user=user)
-
-# --- ANG GI-FIX NGA MGA ROUTES (Edit, Approve, Reject) ---
+    return render_template('create_post.html', post=None)
 
 @app.route('/edit/<int:post_id>', methods=['GET', 'POST'])
 @login_required
 def edit_post(post_id):
     post = Post.query.get_or_404(post_id)
     user = User.query.get(session['user_id'])
-    
     if post.author != user.username and not user.is_admin:
-        flash("Unauthorized!")
         return redirect(url_for('dashboard'))
-    
     if request.method == 'POST':
         post.title = request.form['title']
         post.content = request.form['content']
-        post.slug = make_slug(post.title)
+        post.tags = request.form.get('tags', '')
+        if 'media_file' in request.files:
+            file = request.files['media_file']
+            if file and file.filename != '':
+                ext = file.filename.rsplit('.', 1)[1].lower()
+                filename = f"{uuid.uuid4().hex}.{ext}"
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                post.media_file = filename
+                post.media_type = 'video' if ext in ['mp4', 'mov', 'webm'] else 'image'
         db.session.commit()
         flash("Post updated!")
         return redirect(url_for('dashboard'))
-    return render_template('create_post.html', post=post) # Pwede ra gamiton ang create template para edit
+    return render_template('create_post.html', post=post)
 
 @app.route('/approve/<int:post_id>')
 @admin_required
@@ -207,22 +209,19 @@ def reject_post(post_id):
     db.session.commit()
     return redirect(url_for('dashboard'))
 
-# --- REACTION & PROFILE ---
+@app.route('/media/<filename>')
+def uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
-@app.route('/react/<int:post_id>', methods=['POST'])
+@app.route('/dashboard')
 @login_required
-def react(post_id):
-    post = Post.query.get_or_404(post_id)
-    reaction_type = request.form.get('type')
-    user_id = session['user_id']
-    user_reaction = Reaction.query.filter_by(user_id=user_id, post_id=post.id).first()
-    if user_reaction:
-        if user_reaction.type == reaction_type: db.session.delete(user_reaction)
-        else: user_reaction.type = reaction_type
+def dashboard():
+    user = User.query.get(session['user_id'])
+    if user.is_admin:
+        posts = Post.query.order_by(Post.created_at.desc()).all()
     else:
-        db.session.add(Reaction(user_id=user_id, post_id=post.id, type=reaction_type))
-    db.session.commit()
-    return jsonify(status='ok')
+        posts = Post.query.filter_by(author=user.username).order_by(Post.created_at.desc()).all()
+    return render_template('my_dashboard.html', posts=posts, user=user)
 
 @app.route('/profile/settings', methods=['GET', 'POST'])
 @login_required
@@ -238,17 +237,29 @@ def profile_settings():
                 user.profile_pic = filename
         db.session.commit()
         flash("Profile updated!")
+        return redirect(url_for('dashboard'))
     return render_template('profile_settings.html', user=user)
 
-@app.route('/static/profile_pics/<filename>')
-def uploaded_file(filename):
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+@app.route('/post/<slug>')
+def view_post(slug):
+    post = Post.query.filter_by(slug=slug, approved=True).first_or_404()
+    return render_template('view_post.html', post=post)
 
-@app.route('/user/<username>')
-def public_profile(username):
-    user = User.query.filter_by(username=username).first_or_404()
-    posts = Post.query.filter_by(author=username, approved=True).order_by(Post.created_at.desc()).all()
-    return render_template('public_profile.html', user_profile=user, posts=posts)
+@app.route('/react/<int:post_id>', methods=['POST'])
+@login_required
+def react(post_id):
+    reaction_type = request.form.get('type')
+    user_id = session['user_id']
+    user_reaction = Reaction.query.filter_by(user_id=user_id, post_id=post_id).first()
+    if user_reaction:
+        if user_reaction.type == reaction_type:
+            db.session.delete(user_reaction)
+        else:
+            user_reaction.type = reaction_type
+    else:
+        db.session.add(Reaction(user_id=user_id, post_id=post_id, type=reaction_type))
+    db.session.commit()
+    return jsonify(status='ok')
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)

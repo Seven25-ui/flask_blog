@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,50 +14,56 @@
     <div class="flex items-center space-x-4">
         <a href="{{ url_for('dashboard') }}" class="text-blue-600 dark:text-blue-400 hover:underline font-medium">← Dashboard</a>
         <span id="darkToggle" class="cursor-pointer px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition">💡</span>
-        <a href="{{ url_for('logout') }}" class="text-red-600 dark:text-red-400 hover:underline">Logout</a>
     </div>
 </header>
 
-<div class="max-w-3xl mx-auto p-6 bg-white dark:bg-gray-800 rounded-2xl shadow-lg mt-6 transition-colors duration-300 border border-gray-100 dark:border-gray-700">
-    <form method="POST" class="space-y-5">
+<div class="max-w-3xl mx-auto p-6 bg-white dark:bg-gray-800 rounded-2xl shadow-lg mt-6 mb-10 transition-colors duration-300 border border-gray-100 dark:border-gray-700">
+    <form method="POST" enctype="multipart/form-data" class="space-y-5">
         <div>
             <label class="block text-sm font-bold mb-2 text-gray-500 uppercase tracking-wider">Title</label>
             <input type="text" name="title" placeholder="Enter post title..." required
                    value="{{ post.title if post else '' }}"
-                   class="w-full p-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition">
+                   class="w-full p-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 outline-none transition">
         </div>
 
         <div>
             <label class="block text-sm font-bold mb-2 text-gray-500 uppercase tracking-wider">Content</label>
-            <textarea name="content" placeholder="Write your thoughts here..." rows="12" required
-                      class="w-full p-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition">{{ post.content if post else '' }}</textarea>
+            <textarea name="content" placeholder="Write your thoughts here..." rows="8" required
+                      class="w-full p-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 outline-none transition">{{ post.content if post else '' }}</textarea>
+        </div>
+
+        <div class="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-600">
+            <label class="block text-sm font-bold mb-2 text-gray-500 uppercase tracking-wider">Add Media (Image or Video)</label>
+            <input type="file" name="media_file" accept="image/*,video/*"
+                   class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-gray-600 dark:file:text-gray-200">
+            <p class="mt-2 text-xs text-gray-400 italic">Supported: JPG, PNG, WEBP, MP4, MOV</p>
         </div>
 
         <div>
             <label class="block text-sm font-bold mb-2 text-gray-500 uppercase tracking-wider">Tags</label>
             <input type="text" name="tags" placeholder="life, motivation, tech"
                    value="{{ post.tags if post else '' }}"
-                   class="w-full p-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition">
+                   class="w-full p-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 outline-none transition">
         </div>
 
-        <div class="pt-4">
-            <button type="submit" class="w-full sm:w-auto px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition shadow-md hover:shadow-lg transform active:scale-95">
+        <div class="pt-4 flex gap-3">
+            <button type="submit" class="flex-1 px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition shadow-md transform active:scale-95">
                 {{ 'Update Post' if post else 'Publish Post' }}
             </button>
+            <a href="{{ url_for('dashboard') }}" class="px-8 py-3 bg-gray-200 dark:bg-gray-700 text-center font-bold rounded-xl text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition border-none">
+                Cancel
+            </a>
         </div>
     </form>
 </div>
 
 <script>
-const darkToggle = document.getElementById('darkToggle');
-if (localStorage.getItem('darkMode') === 'true') {
-    document.documentElement.classList.add('dark');
-}
-darkToggle.addEventListener('click', () => {
-    document.documentElement.classList.toggle('dark');
-    localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
-});
+    const darkToggle = document.getElementById('darkToggle');
+    if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
+    darkToggle.addEventListener('click', () => {
+        document.documentElement.classList.toggle('dark');
+        localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
+    });
 </script>
-
 </body>
 </html>
