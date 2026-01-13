@@ -19,7 +19,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 # --- FILE UPLOAD CONFIG ---
-# Gigamit nato ang absolute path para dili mawala ang media files
 UPLOAD_FOLDER = os.path.join(app.instance_path, 'uploads')
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'mp4', 'mov', 'webm'}
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -194,6 +193,31 @@ def edit_post(post_id):
         return redirect(url_for('dashboard'))
     return render_template('create_post.html', post=post)
 
+@app.route('/delete/<int:post_id>', methods=['POST'])
+@login_required
+def delete_post(post_id):
+    post = Post.query.get_or_404(post_id)
+    user = User.query.get(session['user_id'])
+
+    # Security: Author ra o Admin ang pwede mo-delete
+    if post.author == user.username or user.is_admin:
+        # I-delete ang file sa storage kon naa
+        if post.media_file:
+            try:
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], post.media_file)
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+            except Exception as e:
+                print(f"File delete error: {e}")
+
+        db.session.delete(post)
+        db.session.commit()
+        flash("Post deleted successfully!")
+    else:
+        flash("Unauthorized action!")
+    
+    return redirect(url_for('dashboard'))
+
 @app.route('/approve/<int:post_id>')
 @admin_required
 def approve_post(post_id):
@@ -210,10 +234,8 @@ def reject_post(post_id):
     db.session.commit()
     return redirect(url_for('dashboard'))
 
-# --- FIX: Media Serving Route ---
 @app.route('/media/<path:filename>')
 def uploaded_file(filename):
-    # Siguroha nga husto ang folder path padulong sa instance/uploads
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 @app.route('/dashboard')
