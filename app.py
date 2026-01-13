@@ -17,8 +17,6 @@ os.makedirs(app.instance_path, exist_ok=True)
 cloudinary_url = os.environ.get('CLOUDINARY_URL')
 if cloudinary_url:
     cloudinary.config(cloudinary_url=cloudinary_url, secure=True)
-else:
-    print("WARNING: CLOUDINARY_URL not found.")
 
 # --- DATABASE CONFIG ---
 if os.environ.get('DATABASE_URL'):
@@ -94,7 +92,7 @@ def utility_processor():
 @app.route('/public')
 def public_home():
     posts = Post.query.filter_by(approved=True).order_by(Post.created_at.desc()).all()
-    user = User.query.get(session['user_id']) if session.get('user_id') else None
+    user = db.session.get(User, session.get('user_id')) if session.get('user_id') else None
     return render_template('home_public.html', posts=posts, user=user)
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -125,7 +123,7 @@ def login():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    user = User.query.get(session['user_id'])
+    user = db.session.get(User, session['user_id'])
     if not user:
         session.clear()
         return redirect(url_for('login'))
@@ -138,67 +136,99 @@ def dashboard():
 @app.route('/create', methods=['GET', 'POST'])
 @login_required
 def create_post():
-    user = User.query.get(session['user_id'])
+    user = db.session.get(User, session['user_id'])
     if request.method == 'POST':
         title = request.form.get('title')
         content = request.form.get('content')
         tags = request.form.get('tags', '')
         slug = make_slug(title)
-        
+
         if Post.query.filter_by(slug=slug).first():
-            flash("Error: Title already exists. Change it slightly.")
+            flash("Error: Title already exists.")
             return redirect(url_for('create_post'))
 
         media_url, m_type = None, None
         if 'media_file' in request.files:
             file = request.files['media_file']
             if file and file.filename != '':
-                try:
-                    upload_result = cloudinary.uploader.upload(file, resource_type="auto")
-                    media_url = upload_result.get('secure_url')
-                    m_type = 'video' if upload_result.get('resource_type') == 'video' else 'image'
-                except Exception as e:
-                    flash(f"Upload failed: {str(e)}")
-                    return redirect(url_for('create_post'))
+                upload_result = cloudinary.uploader.upload(file, resource_type="auto")
+                media_url = upload_result.get('secure_url')
+                m_type = 'video' if upload_result.get('resource_type') == 'video' else 'image'
 
-        try:
-            post = Post(title=title, content=content, slug=slug, author=user.username,
-                        approved=user.is_admin, tags=tags, media_file=media_url, media_type=m_type)
-            db.session.add(post)
-            db.session.commit()
-            flash("Post submitted!")
-            return redirect(url_for('dashboard'))
-        except Exception as e:
-            db.session.rollback()
-            flash("Database error occurred.")
-            return redirect(url_for('create_post'))
+        post = Post(title=title, content=content, slug=slug, author=user.username,
+                    approved=user.is_admin, tags=tags, media_file=media_url, media_type=m_type)
+        db.session.add(post)
+        db.session.commit()
+        return redirect(url_for('dashboard'))
     return render_template('create_post.html', post=None)
 
-@app.route('/profile/settings', methods=['GET', 'POST'])
+# --- ADDED ROUTES TO FIX BUILDERROR ---
+@app.route('/approve/<int:post_id>')
 @login_required
-def profile_settings():
-    user = User.query.get(session['user_id'])
-    if request.method == 'POST':
-        try:
-            user.bio = request.form.get('bio', '')
-            if 'profile_pic' in request.files:
-                file = request.files['profile_pic']
-                if file and file.filename != '':
-                    upload_result = cloudinary.uploader.upload(file)
-                    user.profile_pic = upload_result.get('secure_url')
+def approve_post(post_id):
+    user = db.session.get(User, session['user_id'])
+    if user.is_admin:
+        post = db.session.get(Post, post_id)
+        if post:
+            post.approved = True
             db.session.commit()
-            flash("Profile updated!")
-            return redirect(url_for('dashboard'))
-        except Exception as e:
-            db.session.rollback()
-            flash(f"Error: {str(e)}")
-            return redirect(url_for('profile_settings'))
-    return render_template('profile_settings.html', user=user)
+    return redirect(url_for('dashboard'))
+
+@app.route('/reject/<int:post_id>')
+@login_required
+def reject_post(post_id):
+    user = db.session.get(User, session['user_id'])
+    if user.is_admin:
+        post = db.session.get(Post, post_id)
+        if post:
+            db.session.delete(post)
+            db.session.commit()
+    return redirect(url_for('dashboard'))
+
+@app.route('/edit/<int:post_id>', methods=['GET', 'POST'])
+@login_required
+def edit_post(post_id):
+    post = db.session.get(Post, post_id)
+    user = db.session.get(User, session['user_id'])
+    if not post or (post.author != user.username and not user.is_admin):
+        return redirect(url_for('dashboard'))
+    if request.method == 'POST':
+        post.title = request.form.get('title')
+        post.content = request.form.get('content')
+        db.session.commit()
+        return redirect(url_for('dashboard'))
+    return render_template('create_post.html', post=post)
+
+@app.route('/delete/<int:post_id>', methods=['POST'])
+@login_required
+def delete_post(post_id):
+    post = db.session.get(Post, post_id)
+    user = db.session.get(User, session['user_id'])
+    if post and (post.author == user.username or user.is_admin):
+        db.session.delete(post)
+        db.session.commit()
+    return redirect(url_for('dashboard'))
 
 @app.route('/post/<slug>')
 def view_post(slug):
     post = Post.query.filter_by(slug=slug, approved=True).first_or_404()
-    return render_template('view_post.html', post=post)
+    user = db.session.get(User, session.get('user_id')) if session.get('user_id') else None
+    return render_template('view_post.html', post=post, user=user)
+
+@app.route('/profile/settings', methods=['GET', 'POST'])
+@login_required
+def profile_settings():
+    user = db.session.get(User, session['user_id'])
+    if request.method == 'POST':
+        user.bio = request.form.get('bio', '')
+        if 'profile_pic' in request.files:
+            file = request.files['profile_pic']
+            if file and file.filename != '':
+                res = cloudinary.uploader.upload(file)
+                user.profile_pic = res.get('secure_url')
+        db.session.commit()
+        return redirect(url_for('dashboard'))
+    return render_template('profile_settings.html', user=user)
 
 @app.route('/logout')
 def logout():
