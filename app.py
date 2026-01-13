@@ -13,8 +13,18 @@ app = Flask(__name__, instance_relative_config=True)
 app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey")
 os.makedirs(app.instance_path, exist_ok=True)
 
-# --- DATABASE CONFIG ---
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(app.instance_path, 'blog.db')
+# --- DATABASE CONFIG (PostgreSQL para Render, SQLite para Termux) ---
+if os.environ.get('DATABASE_URL'):
+    # Kon anaa sa Render, gamita ang PostgreSQL
+    database_url = os.environ.get('DATABASE_URL')
+    # Usbon ang postgres:// ngadto sa postgresql:// para sa SQLAlchemy
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+else:
+    # Kon anaa sa Termux (local), gamita ang SQLite
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(app.instance_path, 'blog.db')
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
@@ -47,7 +57,7 @@ class Post(db.Model):
     approved = db.Column(db.Boolean, default=False)
     tags = db.Column(db.String(200), nullable=True)
     media_file = db.Column(db.String(200), nullable=True)
-    media_type = db.Column(db.String(10), nullable=True) # 'image' or 'video'
+    media_type = db.Column(db.String(10), nullable=True)
 
 class Reaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -143,6 +153,16 @@ def logout():
     session.pop('user_id', None)
     return redirect(url_for('login'))
 
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    user = User.query.get(session['user_id'])
+    if user.is_admin:
+        posts = Post.query.order_by(Post.created_at.desc()).all()
+    else:
+        posts = Post.query.filter_by(author=user.username).order_by(Post.created_at.desc()).all()
+    return render_template('my_dashboard.html', posts=posts, user=user)
+
 @app.route('/create', methods=['GET', 'POST'])
 @login_required
 def create_post():
@@ -198,10 +218,7 @@ def edit_post(post_id):
 def delete_post(post_id):
     post = Post.query.get_or_404(post_id)
     user = User.query.get(session['user_id'])
-
-    # Security: Author ra o Admin ang pwede mo-delete
     if post.author == user.username or user.is_admin:
-        # I-delete ang file sa storage kon naa
         if post.media_file:
             try:
                 file_path = os.path.join(app.config['UPLOAD_FOLDER'], post.media_file)
@@ -209,13 +226,11 @@ def delete_post(post_id):
                     os.remove(file_path)
             except Exception as e:
                 print(f"File delete error: {e}")
-
         db.session.delete(post)
         db.session.commit()
-        flash("Post deleted successfully!")
+        flash("Post deleted!")
     else:
-        flash("Unauthorized action!")
-    
+        flash("Unauthorized!")
     return redirect(url_for('dashboard'))
 
 @app.route('/approve/<int:post_id>')
@@ -237,16 +252,6 @@ def reject_post(post_id):
 @app.route('/media/<path:filename>')
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-
-@app.route('/dashboard')
-@login_required
-def dashboard():
-    user = User.query.get(session['user_id'])
-    if user.is_admin:
-        posts = Post.query.order_by(Post.created_at.desc()).all()
-    else:
-        posts = Post.query.filter_by(author=user.username).order_by(Post.created_at.desc()).all()
-    return render_template('my_dashboard.html', posts=posts, user=user)
 
 @app.route('/profile/settings', methods=['GET', 'POST'])
 @login_required
