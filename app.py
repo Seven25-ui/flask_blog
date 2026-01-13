@@ -55,7 +55,7 @@ class Reaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    type = db.Column(db.String(20), nullable=False)
+    type = db.Column(db.String(20), nullable=False) # 'like' or 'love'
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     post = db.relationship('Post', backref=db.backref('reactions', lazy='dynamic'))
     user = db.relationship('User', backref=db.backref('reactions', lazy='dynamic'))
@@ -103,7 +103,6 @@ def register():
             flash("Username already exists. Please choose another.")
             return redirect(url_for('register'))
         hashed_pw = generate_password_hash(request.form['password'])
-        # First user is admin
         is_admin = not User.query.first()
         db.session.add(User(username=username, password=hashed_pw, is_admin=is_admin))
         db.session.commit()
@@ -169,6 +168,33 @@ def create_post():
         return redirect(url_for('dashboard'))
     return render_template('create_post.html', post=None)
 
+# --- REACTION API ---
+@app.route('/react/<int:post_id>/<type>', methods=['POST'])
+def react(post_id, type):
+    if not session.get('user_id'):
+        return jsonify({'error': 'Login required'}), 401
+    
+    user_id = session['user_id']
+    # Check if this specific reaction exists
+    existing = Reaction.query.filter_by(post_id=post_id, user_id=user_id, type=type).first()
+    
+    if existing:
+        db.session.delete(existing) # Toggle off
+        status = "removed"
+    else:
+        # Optional: Delete other types so user only has one reaction per post
+        Reaction.query.filter_by(post_id=post_id, user_id=user_id).delete()
+        new_reaction = Reaction(post_id=post_id, user_id=user_id, type=type)
+        db.session.add(new_reaction)
+        status = "added"
+    
+    db.session.commit()
+    
+    # Get updated counts
+    count = Reaction.query.filter_by(post_id=post_id, type=type).count()
+    return jsonify({'count': count, 'status': status, 'type': type})
+
+# --- ADMIN ROUTES ---
 @app.route('/approve/<int:post_id>')
 @login_required
 def approve_post(post_id):
@@ -178,7 +204,7 @@ def approve_post(post_id):
         if post:
             post.approved = True
             db.session.commit()
-            flash("Post has been approved and published.")
+            flash("Post approved.")
     return redirect(url_for('dashboard'))
 
 @app.route('/reject/<int:post_id>')
@@ -190,7 +216,7 @@ def reject_post(post_id):
         if post:
             db.session.delete(post)
             db.session.commit()
-            flash("Post rejected and removed.")
+            flash("Post rejected.")
     return redirect(url_for('dashboard'))
 
 @app.route('/edit/<int:post_id>', methods=['GET', 'POST'])
