@@ -33,7 +33,21 @@
         </div>
 
         <div class="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-600">
-            <label class="block text-sm font-bold mb-2 text-gray-500 uppercase tracking-wider">Add Media (Image or Video)</label>
+            <label class="block text-sm font-bold mb-2 text-gray-500 uppercase tracking-wider">
+                {{ 'Replace Media' if post and post.media_file else 'Add Media' }} (Image or Video)
+            </label>
+            
+            {% if post and post.media_file %}
+            <div class="mb-4">
+                <p class="text-xs text-gray-500 mb-2">Current Media:</p>
+                {% if post.media_type == 'video' %}
+                    <video class="h-32 rounded-lg shadow-sm" src="{{ post.media_file }}" controls></video>
+                {% else %}
+                    <img class="h-32 rounded-lg shadow-sm" src="{{ post.media_file }}" alt="Current post image">
+                {% endif %}
+            </div>
+            {% endif %}
+
             <input type="file" name="media_file" accept="image/*,video/*"
                    class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-gray-600 dark:file:text-gray-200">
             <p class="mt-2 text-xs text-gray-400 italic">Supported: JPG, PNG, WEBP, MP4, MOV</p>

@@ -3,72 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Profile Settings • Seven33</title>
+    <title>Profile Settings • Seven33 Blog</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>tailwind.config = { darkMode: 'class' };</script>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300 min-h-screen">
 
 <header class="bg-white dark:bg-gray-800 shadow sticky top-0 z-50">
-    <div class="max-w-2xl mx-auto px-4 py-3 flex justify-between items-center">
-        <a href="{{ url_for('dashboard') }}" class="text-blue-600 font-bold">← Dashboard</a>
-        <h1 class="font-bold uppercase tracking-widest text-sm text-gray-400">Settings</h1>
-        <div class="w-10"></div> </div>
+    <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
+        <h1 class="text-xl font-bold">⚙️ Settings</h1>
+        <div class="flex items-center gap-4">
+            <a href="{{ url_for('dashboard') }}" class="text-blue-600 dark:text-blue-400 hover:underline">← Dashboard</a>
+            <button id="darkToggle" class="p-2 bg-gray-100 dark:bg-gray-700 rounded-full">💡</button>
+        </div>
+    </div>
 </header>
 
-<div class="max-w-2xl mx-auto p-4 mt-6">
-    <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-xl overflow-hidden border border-gray-100 dark:border-gray-700">
-        <div class="bg-gradient-to-r from-purple-600 to-blue-600 h-24"></div>
-        
-        <form method="POST" enctype="multipart/form-data" class="p-6 sm:p-10 -mt-12">
-            <div class="flex flex-col items-center mb-8">
+<div class="max-w-2xl mx-auto p-6 mt-6">
+    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-10 border border-gray-100 dark:border-gray-700">
+        <form method="POST" enctype="multipart/form-data" class="space-y-6">
+            
+            <div class="flex flex-col items-center gap-4">
                 <div class="relative group">
-                    <img id="preview" src="{{ url_for('uploaded_file', filename=user.profile_pic) }}" 
-                         onerror="this.src='https://ui-avatars.com/api/?name={{ user.username }}&background=0D8ABC&color=fff'"
-                         class="w-32 h-32 rounded-full border-4 border-white dark:border-gray-800 object-cover shadow-lg">
-                    <label class="absolute bottom-0 right-0 bg-blue-600 p-2 rounded-full text-white cursor-pointer hover:scale-110 transition shadow-md">
-                        📸
+                    <img id="preview" src="{{ user.profile_pic if user.profile_pic else 'https://res.cloudinary.com/demo/image/upload/d_avatar.png/v1/avatar.png' }}" 
+                         class="w-32 h-32 rounded-full object-cover ring-4 ring-blue-500/20 shadow-lg"
+                         onerror="this.src='https://ui-avatars.com/api/?name={{ user.username }}&background=0D8ABC&color=fff'">
+                    
+                    <label class="absolute bottom-0 right-0 bg-blue-600 text-white p-2 rounded-full cursor-pointer hover:bg-blue-700 shadow-lg transition transform hover:scale-110">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                        </svg>
                         <input type="file" name="profile_pic" class="hidden" accept="image/*" onchange="previewImage(event)">
                     </label>
                 </div>
-                <h2 class="mt-4 text-2xl font-black">{{ user.username }}</h2>
-                <p class="text-sm text-gray-500">I-update ang imong profile picture ug bio</p>
+                <p class="text-sm font-medium text-gray-500">Change Profile Photo</p>
             </div>
 
-            <div class="space-y-6">
-                <div>
-                    <label class="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">About Me (Bio)</label>
-                    <textarea name="bio" rows="4" placeholder="Isulti gamay bahin sa imong kaugalingon..."
-                              class="w-full p-4 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition">{{ user.bio or '' }}</textarea>
-                </div>
+            <hr class="border-gray-100 dark:border-gray-700">
 
-                <div class="pt-4">
-                    <button type="submit" class="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl shadow-lg shadow-blue-500/30 transition transform active:scale-95">
-                        SAVE CHANGES
-                    </button>
-                </div>
+            <div>
+                <label class="block text-sm font-bold text-gray-500 mb-2 uppercase tracking-wider">About Me (Bio)</label>
+                <textarea name="bio" rows="4" placeholder="Tell us about yourself..."
+                          class="w-full p-4 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 outline-none transition">{{ user.bio if user.bio else '' }}</textarea>
             </div>
+
+            <button type="submit" class="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg transition transform active:scale-[0.98]">
+                💾 Save Changes
+            </button>
+
+            <a href="{{ url_for('dashboard') }}" class="block text-center text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 font-medium text-sm">
+                Cancel
+            </a>
         </form>
     </div>
-    
-    <p class="text-center mt-8 text-sm text-gray-500">
-        Gusto mo-logout? <a href="{{ url_for('logout') }}" class="text-red-500 font-bold">I-click dinhi.</a>
-    </p>
 </div>
 
 <script>
-    // Preview image before upload
+    // Live preview para sa pagpili og bag-ong hulagway
     function previewImage(event) {
         const reader = new FileReader();
         reader.onload = function() {
             const output = document.getElementById('preview');
             output.src = reader.result;
-        };
+        }
         reader.readAsDataURL(event.target.files[0]);
     }
 
+    const darkToggle = document.getElementById('darkToggle');
     if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
+    darkToggle.addEventListener('click', () => {
+        document.documentElement.classList.toggle('dark');
+        localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
+    });
 </script>
-
 </body>
 </html>

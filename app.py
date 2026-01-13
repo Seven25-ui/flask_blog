@@ -15,7 +15,7 @@ app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey")
 os.makedirs(app.instance_path, exist_ok=True)
 
 # --- CLOUDINARY CONFIG ---
-# Kini automatic na mobasa sa 'CLOUDINARY_URL' variable gikan sa Render
+# Kini automatic na mobasa sa 'CLOUDINARY_URL' variable gikan sa Render Environment
 cloudinary.config(secure=True)
 
 # --- DATABASE CONFIG ---
@@ -37,7 +37,6 @@ class User(db.Model):
     password = db.Column(db.String(200), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
     bio = db.Column(db.Text, nullable=True)
-    # Default avatar gikan sa Cloudinary
     profile_pic = db.Column(db.String(500), default='https://res.cloudinary.com/demo/image/upload/d_avatar.png/v1/avatar.png')
 
 class Post(db.Model):
@@ -75,6 +74,16 @@ def login_required(f):
         if not session.get('user_id'):
             flash("Please login first!")
             return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated
+
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        user = User.query.get(session.get('user_id'))
+        if not user or not user.is_admin:
+            flash("Admin access required!")
+            return redirect(url_for('public_home'))
         return f(*args, **kwargs)
     return decorated
 
@@ -144,11 +153,8 @@ def create_post():
         if 'media_file' in request.files:
             file = request.files['media_file']
             if file and file.filename != '':
-                # I-upload sa Cloudinary (automatic image/video detection)
                 upload_result = cloudinary.uploader.upload(file, resource_type="auto")
                 media_url = upload_result['secure_url']
-                
-                # Mas maayo nga checking sa media type gikan sa Cloudinary result
                 m_type = 'video' if upload_result['resource_type'] == 'video' else 'image'
 
         post = Post(title=title, content=content, slug=slug, author=user.username,
@@ -158,6 +164,67 @@ def create_post():
         flash("Post submitted!")
         return redirect(url_for('dashboard'))
     return render_template('create_post.html', post=None)
+
+# --- NEW: ADMIN & EDIT/DELETE ROUTES ---
+
+@app.route('/approve/<int:post_id>')
+@admin_required
+def approve_post(post_id):
+    post = Post.query.get_or_404(post_id)
+    post.approved = True
+    db.session.commit()
+    flash("Post approved!")
+    return redirect(url_for('dashboard'))
+
+@app.route('/reject/<int:post_id>')
+@admin_required
+def reject_post(post_id):
+    post = Post.query.get_or_404(post_id)
+    db.session.delete(post)
+    db.session.commit()
+    flash("Post rejected and removed.")
+    return redirect(url_for('dashboard'))
+
+@app.route('/edit/<int:post_id>', methods=['GET', 'POST'])
+@login_required
+def edit_post(post_id):
+    post = Post.query.get_or_404(post_id)
+    user = User.query.get(session['user_id'])
+    
+    if post.author != user.username and not user.is_admin:
+        flash("You are not authorized to edit this post!")
+        return redirect(url_for('dashboard'))
+
+    if request.method == 'POST':
+        post.title = request.form['title']
+        post.content = request.form['content']
+        post.tags = request.form.get('tags', '')
+        
+        if 'media_file' in request.files:
+            file = request.files['media_file']
+            if file and file.filename != '':
+                upload_result = cloudinary.uploader.upload(file, resource_type="auto")
+                post.media_file = upload_result['secure_url']
+                post.media_type = 'video' if upload_result['resource_type'] == 'video' else 'image'
+        
+        db.session.commit()
+        flash("Post updated!")
+        return redirect(url_for('dashboard'))
+    return render_template('create_post.html', post=post)
+
+@app.route('/delete/<int:post_id>', methods=['POST'])
+@login_required
+def delete_post(post_id):
+    post = Post.query.get_or_404(post_id)
+    user = User.query.get(session['user_id'])
+    
+    if post.author == user.username or user.is_admin:
+        db.session.delete(post)
+        db.session.commit()
+        flash("Post deleted!")
+    else:
+        flash("Unauthorized action!")
+    return redirect(url_for('dashboard'))
 
 @app.route('/profile/settings', methods=['GET', 'POST'])
 @login_required
@@ -174,22 +241,6 @@ def profile_settings():
         flash("Profile updated!")
         return redirect(url_for('dashboard'))
     return render_template('profile_settings.html', user=user)
-
-@app.route('/react/<int:post_id>', methods=['POST'])
-@login_required
-def react(post_id):
-    user_id = session['user_id']
-    reaction_type = request.form.get('type')
-    existing = Reaction.query.filter_by(post_id=post_id, user_id=user_id).first()
-    if existing:
-        if existing.type == reaction_type:
-            db.session.delete(existing)
-        else:
-            existing.type = reaction_type
-    else:
-        db.session.add(Reaction(post_id=post_id, user_id=user_id, type=reaction_type))
-    db.session.commit()
-    return jsonify(success=True)
 
 @app.route('/post/<slug>')
 def view_post(slug):
