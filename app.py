@@ -6,37 +6,29 @@ import re
 from datetime import datetime
 from functools import wraps
 from werkzeug.utils import secure_filename
-import uuid
+import cloudinary
+import cloudinary.uploader
 
 # --- APP SETUP ---
 app = Flask(__name__, instance_relative_config=True)
 app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey")
 os.makedirs(app.instance_path, exist_ok=True)
 
-# --- DATABASE CONFIG (PostgreSQL para Render, SQLite para Termux) ---
+# --- CLOUDINARY CONFIG ---
+# Kini automatic na mobasa sa 'CLOUDINARY_URL' variable gikan sa Render
+cloudinary.config(secure=True)
+
+# --- DATABASE CONFIG ---
 if os.environ.get('DATABASE_URL'):
-    # Kon anaa sa Render, gamita ang PostgreSQL
     database_url = os.environ.get('DATABASE_URL')
-    # Usbon ang postgres:// ngadto sa postgresql:// para sa SQLAlchemy
     if database_url.startswith("postgres://"):
         database_url = database_url.replace("postgres://", "postgresql://", 1)
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 else:
-    # Kon anaa sa Termux (local), gamita ang SQLite
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(app.instance_path, 'blog.db')
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
-
-# --- FILE UPLOAD CONFIG ---
-UPLOAD_FOLDER = os.path.join(app.instance_path, 'uploads')
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'mp4', 'mov', 'webm'}
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024  # 20MB
-
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # --- MODELS ---
 class User(db.Model):
@@ -45,7 +37,8 @@ class User(db.Model):
     password = db.Column(db.String(200), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
     bio = db.Column(db.Text, nullable=True)
-    profile_pic = db.Column(db.String(200), default='default-avatar.png')
+    # Default avatar gikan sa Cloudinary
+    profile_pic = db.Column(db.String(500), default='https://res.cloudinary.com/demo/image/upload/d_avatar.png/v1/avatar.png')
 
 class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -56,7 +49,7 @@ class Post(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     approved = db.Column(db.Boolean, default=False)
     tags = db.Column(db.String(200), nullable=True)
-    media_file = db.Column(db.String(200), nullable=True)
+    media_file = db.Column(db.String(500), nullable=True) # Cloudinary URL
     media_type = db.Column(db.String(10), nullable=True)
 
 class Reaction(db.Model):
@@ -85,44 +78,22 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated
 
-def admin_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        user = User.query.get(session.get('user_id'))
-        if not user or not user.is_admin:
-            flash("Admin access required!")
-            return redirect(url_for('public_home'))
-        return f(*args, **kwargs)
-    return decorated
-
-def get_read_time(content):
-    if not content: return 1
-    words = len(content.split())
-    minutes = round(words / 200)
-    return minutes if minutes > 0 else 1
-
 @app.context_processor
 def utility_processor():
     def get_user_by_username(username):
         return User.query.filter_by(username=username).first()
+    def get_read_time(content):
+        words = len(content.split())
+        return max(1, words // 200)
     return dict(get_user_by_username=get_user_by_username, get_read_time=get_read_time)
 
 # --- ROUTES ---
-
 @app.route('/')
 @app.route('/public')
-@app.route('/public/page/<int:page>')
-def public_home(page=1):
-    per_page = 5
-    posts = Post.query.filter_by(approved=True).order_by(Post.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
+def public_home():
+    posts = Post.query.filter_by(approved=True).order_by(Post.created_at.desc()).all()
     user = User.query.get(session['user_id']) if session.get('user_id') else None
     return render_template('home_public.html', posts=posts, user=user)
-
-@app.route('/profile/<username>')
-def public_profile(username):
-    user_profile = User.query.filter_by(username=username).first_or_404()
-    posts = Post.query.filter_by(author=username, approved=True).order_by(Post.created_at.desc()).all()
-    return render_template('public_profile.html', user_profile=user_profile, posts=posts)
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -148,11 +119,6 @@ def login():
         flash("Invalid credentials")
     return render_template('login.html')
 
-@app.route('/logout')
-def logout():
-    session.pop('user_id', None)
-    return redirect(url_for('login'))
-
 @app.route('/dashboard')
 @login_required
 def dashboard():
@@ -172,86 +138,26 @@ def create_post():
         content = request.form['content']
         tags = request.form.get('tags', '')
         slug = make_slug(title)
-        filename = None
+        media_url = None
         m_type = None
+
         if 'media_file' in request.files:
             file = request.files['media_file']
             if file and file.filename != '':
-                ext = file.filename.rsplit('.', 1)[1].lower()
-                filename = f"{uuid.uuid4().hex}.{ext}"
-                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-                m_type = 'video' if ext in ['mp4', 'mov', 'webm'] else 'image'
+                # I-upload sa Cloudinary (automatic image/video detection)
+                upload_result = cloudinary.uploader.upload(file, resource_type="auto")
+                media_url = upload_result['secure_url']
+                
+                # Mas maayo nga checking sa media type gikan sa Cloudinary result
+                m_type = 'video' if upload_result['resource_type'] == 'video' else 'image'
+
         post = Post(title=title, content=content, slug=slug, author=user.username,
-                    approved=user.is_admin, tags=tags, media_file=filename, media_type=m_type)
+                    approved=user.is_admin, tags=tags, media_file=media_url, media_type=m_type)
         db.session.add(post)
         db.session.commit()
         flash("Post submitted!")
         return redirect(url_for('dashboard'))
     return render_template('create_post.html', post=None)
-
-@app.route('/edit/<int:post_id>', methods=['GET', 'POST'])
-@login_required
-def edit_post(post_id):
-    post = Post.query.get_or_404(post_id)
-    user = User.query.get(session['user_id'])
-    if post.author != user.username and not user.is_admin:
-        return redirect(url_for('dashboard'))
-    if request.method == 'POST':
-        post.title = request.form['title']
-        post.content = request.form['content']
-        post.tags = request.form.get('tags', '')
-        if 'media_file' in request.files:
-            file = request.files['media_file']
-            if file and file.filename != '':
-                ext = file.filename.rsplit('.', 1)[1].lower()
-                filename = f"{uuid.uuid4().hex}.{ext}"
-                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-                post.media_file = filename
-                post.media_type = 'video' if ext in ['mp4', 'mov', 'webm'] else 'image'
-        db.session.commit()
-        flash("Post updated!")
-        return redirect(url_for('dashboard'))
-    return render_template('create_post.html', post=post)
-
-@app.route('/delete/<int:post_id>', methods=['POST'])
-@login_required
-def delete_post(post_id):
-    post = Post.query.get_or_404(post_id)
-    user = User.query.get(session['user_id'])
-    if post.author == user.username or user.is_admin:
-        if post.media_file:
-            try:
-                file_path = os.path.join(app.config['UPLOAD_FOLDER'], post.media_file)
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-            except Exception as e:
-                print(f"File delete error: {e}")
-        db.session.delete(post)
-        db.session.commit()
-        flash("Post deleted!")
-    else:
-        flash("Unauthorized!")
-    return redirect(url_for('dashboard'))
-
-@app.route('/approve/<int:post_id>')
-@admin_required
-def approve_post(post_id):
-    post = Post.query.get_or_404(post_id)
-    post.approved = True
-    db.session.commit()
-    return redirect(url_for('dashboard'))
-
-@app.route('/reject/<int:post_id>')
-@admin_required
-def reject_post(post_id):
-    post = Post.query.get_or_404(post_id)
-    db.session.delete(post)
-    db.session.commit()
-    return redirect(url_for('dashboard'))
-
-@app.route('/media/<path:filename>')
-def uploaded_file(filename):
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 @app.route('/profile/settings', methods=['GET', 'POST'])
 @login_required
@@ -261,35 +167,39 @@ def profile_settings():
         user.bio = request.form.get('bio', '')
         if 'profile_pic' in request.files:
             file = request.files['profile_pic']
-            if file and allowed_file(file.filename):
-                filename = f"{uuid.uuid4().hex}.{file.filename.rsplit('.', 1)[1].lower()}"
-                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-                user.profile_pic = filename
+            if file and file.filename != '':
+                upload_result = cloudinary.uploader.upload(file)
+                user.profile_pic = upload_result['secure_url']
         db.session.commit()
         flash("Profile updated!")
         return redirect(url_for('dashboard'))
     return render_template('profile_settings.html', user=user)
+
+@app.route('/react/<int:post_id>', methods=['POST'])
+@login_required
+def react(post_id):
+    user_id = session['user_id']
+    reaction_type = request.form.get('type')
+    existing = Reaction.query.filter_by(post_id=post_id, user_id=user_id).first()
+    if existing:
+        if existing.type == reaction_type:
+            db.session.delete(existing)
+        else:
+            existing.type = reaction_type
+    else:
+        db.session.add(Reaction(post_id=post_id, user_id=user_id, type=reaction_type))
+    db.session.commit()
+    return jsonify(success=True)
 
 @app.route('/post/<slug>')
 def view_post(slug):
     post = Post.query.filter_by(slug=slug, approved=True).first_or_404()
     return render_template('view_post.html', post=post)
 
-@app.route('/react/<int:post_id>', methods=['POST'])
-@login_required
-def react(post_id):
-    reaction_type = request.form.get('type')
-    user_id = session['user_id']
-    user_reaction = Reaction.query.filter_by(user_id=user_id, post_id=post_id).first()
-    if user_reaction:
-        if user_reaction.type == reaction_type:
-            db.session.delete(user_reaction)
-        else:
-            user_reaction.type = reaction_type
-    else:
-        db.session.add(Reaction(user_id=user_id, post_id=post_id, type=reaction_type))
-    db.session.commit()
-    return jsonify(status='ok')
+@app.route('/logout')
+def logout():
+    session.pop('user_id', None)
+    return redirect(url_for('login'))
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)

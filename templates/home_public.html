@@ -48,20 +48,22 @@
 </header>
 
 <div class="max-w-4xl mx-auto p-4">
-    {% if posts.items %}
-        {% for post in posts.items %}
+    {% set posts_list = posts.items if posts.items is defined else posts %}
+    
+    {% if posts_list %}
+        {% for post in posts_list %}
         <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm mb-6 border border-gray-200 dark:border-gray-700 overflow-hidden">
 
             <div class="p-5 sm:p-6 pb-2 flex items-start gap-3">
                 {% set post_user = get_user_by_username(post.author) %}
                 <div class="flex-shrink-0">
-                    <a href="{{ url_for('public_profile', username=post.author) }}">
-                        <img src="{{ url_for('uploaded_file', filename=post_user.profile_pic if post_user else 'default-avatar.png') }}"
+                    <a href="#">
+                        <img src="{{ post_user.profile_pic if post_user and post_user.profile_pic else 'https://res.cloudinary.com/demo/image/upload/d_avatar.png/v1/avatar.png' }}"
                              onerror="this.src='https://ui-avatars.com/api/?name={{ post.author }}&background=0D8ABC&color=fff'"
                              class="w-12 h-12 rounded-full object-cover ring-2 ring-gray-100 dark:ring-gray-700 shadow-sm hover:opacity-80 transition">
                     </a>
                 </div>
-
+                
                 <div class="flex-1">
                     <h2 class="text-xl font-bold leading-tight">
                         <a href="{{ url_for('view_post', slug=post.slug) }}" class="hover:text-blue-600 transition">
@@ -69,23 +71,19 @@
                         </a>
                     </h2>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wider font-semibold">
-                        By 
-                        <a href="{{ url_for('public_profile', username=post.author) }}" class="text-blue-500 hover:underline">
-                            {{ post.author }}
-                        </a>
+                        By <span class="text-blue-500">{{ post.author }}</span>
                         • {{ post.created_at.strftime('%b %d, %Y') }}
-                        • <span class="text-indigo-500">⏱️ {{ get_read_time(post.content) }} min read</span>
                     </p>
                 </div>
             </div>
-
+            
             {% if post.media_file %}
             <div class="mt-2 border-y dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
                 {% if post.media_type == 'image' %}
-                    <img src="{{ url_for('uploaded_file', filename=post.media_file) }}" class="w-full h-auto max-h-[600px] object-contain mx-auto">
+                    <img src="{{ post.media_file }}" class="w-full h-auto max-h-[600px] object-contain mx-auto">
                 {% elif post.media_type == 'video' %}
                     <video controls class="w-full">
-                        <source src="{{ url_for('uploaded_file', filename=post.media_file) }}" type="video/mp4">
+                        <source src="{{ post.media_file }}" type="video/mp4">
                         Your browser does not support the video tag.
                     </video>
                 {% endif %}
@@ -136,70 +134,47 @@
             </div>
         </div>
         {% endfor %}
-        {% endif %}
+    {% endif %}
 </div>
 
 <div id="toast-container" class="fixed bottom-5 left-1/2 -translate-x-1/2 sm:left-auto sm:right-5 sm:translate-x-0 z-[100] flex flex-col gap-2 w-full max-w-xs px-4"></div>
 
 <script>
-// ... (All scripts from your original file)
-function showToast(message, type = 'success') {
-    const container = document.getElementById('toast-container');
-    const toast = document.createElement('div');
-    const bgColor = type === 'success' ? 'bg-blue-600' : 'bg-red-600';
-    toast.className = `${bgColor} text-white px-6 py-3 rounded-2xl shadow-2xl transform translate-y-10 opacity-0 flex items-center justify-center gap-3 font-bold text-sm text-center transition-all duration-300`;
-    toast.innerHTML = `<span>${type === 'success' ? ' ✨' : '⚠️'}</span><span>${message}</span>`;
-    container.appendChild(toast);
-    setTimeout(() => toast.classList.remove('translate-y-10', 'opacity-0'), 100);
-    setTimeout(() => {
-        toast.classList.add('opacity-0', 'translate-y-10');
-        setTimeout(() => toast.remove(), 400);
-    }, 2500);
-}
-
-function toggleContent(id){
-    document.getElementById('content-'+id).classList.toggle('hidden');
-    document.getElementById('full-'+id).classList.toggle('hidden');
-}
-
-let popupTimeout;
-function showReactionPopup(id) {
-    clearTimeout(popupTimeout);
-    document.getElementById('popup-'+id).classList.add('show');
-}
-function hideReactionPopup(id) {
-    popupTimeout = setTimeout(() => {
-        const popup = document.getElementById('popup-'+id);
-        if(popup) popup.classList.remove('show');
-    }, 300);
-}
-
-function sendReaction(postId, type) {
-    const emojiMap = {'like': '👍', 'love': '❤️', 'haha': '😂', 'sad': '😢', 'angry': '😡'};
-    fetch(`/react/${postId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `type=${type}`
-    }).then(() => {
-        sessionStorage.setItem('reacted_emoji', emojiMap[type]);
-        location.reload();
-    });
-}
-
-window.onload = () => {
-    const emoji = sessionStorage.getItem('reacted_emoji');
-    if (emoji) {
-        showToast(`You reacted with ${emoji}`);
-        sessionStorage.removeItem('reacted_emoji');
+    function toggleContent(id){
+        document.getElementById('content-'+id).classList.toggle('hidden');
+        document.getElementById('full-'+id).classList.toggle('hidden');
     }
-};
 
-const darkToggle = document.getElementById('darkToggle');
-if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
-darkToggle.addEventListener('click', () => {
-    document.documentElement.classList.toggle('dark');
-    localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
-});
+    let popupTimeout;
+    function showReactionPopup(id) {
+        clearTimeout(popupTimeout);
+        document.getElementById('popup-'+id).classList.add('show');
+    }
+    function hideReactionPopup(id) {
+        popupTimeout = setTimeout(() => {
+            const popup = document.getElementById('popup-'+id);
+            if(popup) popup.classList.remove('show');
+        }, 300);
+    }
+
+    function sendReaction(postId, type) {
+        const emojiMap = {'like': '👍', 'love': '❤️', 'haha': '😂', 'sad': '😢', 'angry': '😡'};
+        fetch(`/react/${postId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `type=${type}`
+        }).then(() => {
+            sessionStorage.setItem('reacted_emoji', emojiMap[type]);
+            location.reload();
+        });
+    }
+
+    const darkToggle = document.getElementById('darkToggle');
+    if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
+    darkToggle.addEventListener('click', () => {
+        document.documentElement.classList.toggle('dark');
+        localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
+    });
 </script>
 </body>
 </html>

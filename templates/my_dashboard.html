@@ -1,24 +1,22 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Seven33 Blog - Dashboard</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script>
-  tailwind.config = { darkMode: 'class' };
-</script>
-<style>
-  .reaction-btn { position: relative; transition: all 0.2s ease; }
-  .reaction-btn:hover { transform: translateY(-3px); }
-  .status-badge {
-    display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
-    border-radius: 12px; font-size: 0.75rem; font-weight: 600;
-  }
-  .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-  .hide-scrollbar::-webkit-scrollbar { display: none; }
-  #toast-container div { transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seven33 Blog - Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>tailwind.config = { darkMode: 'class' };</script>
+    <style>
+        .reaction-btn { position: relative; transition: all 0.2s ease; }
+        .reaction-btn:hover { transform: translateY(-3px); }
+        .status-badge {
+            display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
+            border-radius: 12px; font-size: 0.75rem; font-weight: 600;
+        }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        #toast-container div { transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+    </style>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300 min-h-screen">
 
@@ -54,17 +52,11 @@
             <div class="flex items-start gap-3 mb-4">
                 {% set post_user = get_user_by_username(post.author) %}
                 <div class="flex-shrink-0">
-                    {% if post_user %}
-                        <img src="{{ url_for('uploaded_file', filename=post_user.profile_pic) }}"
-                             onerror="this.src='https://ui-avatars.com/api/?name={{ post.author }}&background=0D8ABC&color=fff'"
-                             class="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover shadow-sm ring-2 ring-gray-100 dark:ring-gray-700">
-                    {% else %}
-                        <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-lg shadow-sm">
-                            {{ post.author[0].upper() }}
-                        </div>
-                    {% endif %}
+                    <img src="{{ post_user.profile_pic if post_user and post_user.profile_pic else 'https://res.cloudinary.com/demo/image/upload/d_avatar.png/v1/avatar.png' }}"
+                         onerror="this.src='https://ui-avatars.com/api/?name={{ post.author }}&background=0D8ABC&color=fff'"
+                         class="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover shadow-sm ring-2 ring-gray-100 dark:ring-gray-700">
                 </div>
-
+                
                 <div class="flex-1 min-w-0">
                     <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1">
                         <div>
@@ -84,6 +76,16 @@
                     </div>
                 </div>
             </div>
+
+            {% if post.media_file %}
+            <div class="mb-4 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-900">
+                {% if post.media_type == 'video' %}
+                    <video class="w-full max-h-64 object-cover" src="{{ post.media_file }}" muted></video>
+                {% else %}
+                    <img class="w-full max-h-64 object-cover" src="{{ post.media_file }}" alt="Post image">
+                {% endif %}
+            </div>
+            {% endif %}
 
             <div class="mb-5 text-sm sm:text-base leading-relaxed text-gray-700 dark:text-gray-300">
                 <div id="content-{{ post.id }}">
@@ -107,7 +109,6 @@
 
                 {% if post.author == user.username or user.is_admin %}
                     <a href="{{ url_for('edit_post', post_id=post.id) }}" class="flex-1 text-center sm:flex-none px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold transition shadow-sm">✏️ Edit</a>
-                    
                     <form action="{{ url_for('delete_post', post_id=post.id) }}" method="POST" class="flex-1 sm:flex-none" onsubmit="return confirmDelete(event)">
                         <button type="submit" class="w-full px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-bold transition shadow-sm">
                             🗑️ Delete
@@ -134,10 +135,8 @@
         const container = document.getElementById('toast-container');
         const toast = document.createElement('div');
         const bgColor = type === 'success' ? 'bg-green-600' : (type === 'error' ? 'bg-red-600' : 'bg-blue-600');
-
         toast.className = `${bgColor} text-white px-6 py-3 rounded-xl shadow-2xl transform translate-y-10 opacity-0 flex items-center gap-3 font-bold transition-all duration-300`;
         toast.innerHTML = `<span>${type === 'success' ? '✅' : '🗑️'}</span><span>${message}</span>`;
-
         container.appendChild(toast);
         setTimeout(() => toast.classList.remove('translate-y-10', 'opacity-0'), 100);
         setTimeout(() => {
