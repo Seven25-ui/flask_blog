@@ -39,16 +39,21 @@
 </header>
 
 <div class="max-w-4xl mx-auto p-4 mt-2">
-    <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-2xl shadow-lg mb-6">
-        <h2 class="text-xl sm:text-2xl font-bold mb-1">Maayong adlaw, {{ user.username }}! 👋</h2>
-        <p class="text-blue-100 text-sm sm:text-base opacity-90">
-            {% if user.is_admin %} Admin Account: Pwede nimo i-manage ang tanan posts. {% else %} Ania ang imong mga sinuwat. Padayon sa pag-create! {% endif %}
-        </p>
+    <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-2xl shadow-lg mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div>
+            <h2 class="text-xl sm:text-2xl font-bold mb-1">Maayong adlaw, {{ user.username }}! 👋</h2>
+            <p class="text-blue-100 text-sm sm:text-base opacity-90">
+                {% if user.is_admin %} Admin Account: I-manage ang komunidad. {% else %} Padayon sa pag-create og nindot nga sulod! {% endif %}
+            </p>
+        </div>
+        <a href="{{ url_for('create_post') }}" class="w-full sm:w-auto px-6 py-3 bg-white text-blue-600 font-bold rounded-xl shadow-md hover:bg-blue-50 transition text-center">
+            + New Post
+        </a>
     </div>
 
     {% if posts %}
         {% for post in posts %}
-        <div class="bg-white dark:bg-gray-800 p-5 sm:p-6 rounded-2xl shadow-sm mb-5 border border-gray-200 dark:border-gray-700">
+        <div class="bg-white dark:bg-gray-800 p-5 sm:p-6 rounded-2xl shadow-sm mb-5 border border-gray-200 dark:border-gray-700 transition hover:shadow-md">
             <div class="flex items-start gap-3 mb-4">
                 {% set post_user = get_user_by_username(post.author) %}
                 <div class="flex-shrink-0">
@@ -56,7 +61,7 @@
                          onerror="this.src='https://ui-avatars.com/api/?name={{ post.author }}&background=0D8ABC&color=fff'"
                          class="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover shadow-sm ring-2 ring-gray-100 dark:ring-gray-700">
                 </div>
-                
+
                 <div class="flex-1 min-w-0">
                     <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1">
                         <div>
@@ -64,13 +69,16 @@
                             <p class="text-xs sm:text-sm text-gray-500 flex items-center gap-2">
                                 📅 {{ post.created_at.strftime('%b %d, %Y') }}
                                 <span class="text-blue-500 font-medium">⏱️ {{ get_read_time(post.content) }} min read</span>
+                                {% if user.is_admin %}
+                                <span class="text-purple-500 font-bold ml-1">👤 By: {{ post.author }}</span>
+                                {% endif %}
                             </p>
                         </div>
                         <div class="mt-1 sm:mt-0">
                             {% if post.approved %}
                                 <span class="status-badge bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">✓ Published</span>
                             {% else %}
-                                <span class="status-badge bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">⏳ Pending</span>
+                                <span class="status-badge bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">⏳ Pending Review</span>
                             {% endif %}
                         </div>
                     </div>
@@ -78,18 +86,18 @@
             </div>
 
             {% if post.media_file %}
-            <div class="mb-4 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-900">
+            <div class="mb-4 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-900 aspect-video flex items-center justify-center">
                 {% if post.media_type == 'video' %}
-                    <video class="w-full max-h-64 object-cover" src="{{ post.media_file }}" muted></video>
+                    <video class="w-full h-full object-cover" src="{{ post.media_file }}" controls></video>
                 {% else %}
-                    <img class="w-full max-h-64 object-cover" src="{{ post.media_file }}" alt="Post image">
+                    <img class="w-full h-full object-cover" src="{{ post.media_file }}" alt="Post image">
                 {% endif %}
             </div>
             {% endif %}
 
             <div class="mb-5 text-sm sm:text-base leading-relaxed text-gray-700 dark:text-gray-300">
                 <div id="content-{{ post.id }}">
-                    {{ post.content[:200] | safe }}{% if post.content|length > 200 %}...
+                    {{ post.content[:150] | safe }}{% if post.content|length > 150 %}...
                     <button class="text-blue-500 font-bold hover:underline" onclick="toggleContent({{ post.id }})">See More</button>
                     {% endif %}
                 </div>

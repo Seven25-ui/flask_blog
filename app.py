@@ -143,8 +143,8 @@ def dashboard():
 def create_post():
     user = User.query.get(session['user_id'])
     if request.method == 'POST':
-        title = request.form['title']
-        content = request.form['content']
+        title = request.form.get('title')
+        content = request.form.get('content')
         tags = request.form.get('tags', '')
         slug = make_slug(title)
         media_url = None
@@ -153,19 +153,31 @@ def create_post():
         if 'media_file' in request.files:
             file = request.files['media_file']
             if file and file.filename != '':
-                upload_result = cloudinary.uploader.upload(file, resource_type="auto")
-                media_url = upload_result['secure_url']
-                m_type = 'video' if upload_result['resource_type'] == 'video' else 'image'
+                try:
+                    upload_result = cloudinary.uploader.upload(file, resource_type="auto")
+                    media_url = upload_result.get('secure_url')
+                    m_type = 'video' if upload_result.get('resource_type') == 'video' else 'image'
+                except Exception as e:
+                    print(f"DEBUG CREATE UPLOAD ERROR: {str(e)}")
+                    flash(f"Upload failed: {str(e)}")
+                    return redirect(url_for('create_post'))
 
-        post = Post(title=title, content=content, slug=slug, author=user.username,
-                    approved=user.is_admin, tags=tags, media_file=media_url, media_type=m_type)
-        db.session.add(post)
-        db.session.commit()
-        flash("Post submitted!")
-        return redirect(url_for('dashboard'))
+        try:
+            post = Post(title=title, content=content, slug=slug, author=user.username,
+                        approved=user.is_admin, tags=tags, media_file=media_url, media_type=m_type)
+            db.session.add(post)
+            db.session.commit()
+            flash("Post submitted!")
+            return redirect(url_for('dashboard'))
+        except Exception as e:
+            db.session.rollback()
+            print(f"DEBUG CREATE DB ERROR: {str(e)}")
+            flash("Database error, please try again.")
+            return redirect(url_for('create_post'))
+            
     return render_template('create_post.html', post=None)
 
-# --- NEW: ADMIN & EDIT/DELETE ROUTES ---
+# --- ADMIN & EDIT/DELETE ROUTES ---
 
 @app.route('/approve/<int:post_id>')
 @admin_required
@@ -190,26 +202,33 @@ def reject_post(post_id):
 def edit_post(post_id):
     post = Post.query.get_or_404(post_id)
     user = User.query.get(session['user_id'])
-    
+
     if post.author != user.username and not user.is_admin:
         flash("You are not authorized to edit this post!")
         return redirect(url_for('dashboard'))
 
     if request.method == 'POST':
-        post.title = request.form['title']
-        post.content = request.form['content']
-        post.tags = request.form.get('tags', '')
-        
-        if 'media_file' in request.files:
-            file = request.files['media_file']
-            if file and file.filename != '':
-                upload_result = cloudinary.uploader.upload(file, resource_type="auto")
-                post.media_file = upload_result['secure_url']
-                post.media_type = 'video' if upload_result['resource_type'] == 'video' else 'image'
-        
-        db.session.commit()
-        flash("Post updated!")
-        return redirect(url_for('dashboard'))
+        try:
+            post.title = request.form.get('title')
+            post.content = request.form.get('content')
+            post.tags = request.form.get('tags', '')
+
+            if 'media_file' in request.files:
+                file = request.files['media_file']
+                if file and file.filename != '':
+                    upload_result = cloudinary.uploader.upload(file, resource_type="auto")
+                    post.media_file = upload_result.get('secure_url')
+                    post.media_type = 'video' if upload_result.get('resource_type') == 'video' else 'image'
+
+            db.session.commit()
+            flash("Post updated!")
+            return redirect(url_for('dashboard'))
+        except Exception as e:
+            db.session.rollback()
+            print(f"DEBUG EDIT ERROR: {str(e)}")
+            flash(f"Update failed: {str(e)}")
+            return redirect(url_for('edit_post', post_id=post.id))
+            
     return render_template('create_post.html', post=post)
 
 @app.route('/delete/<int:post_id>', methods=['POST'])
@@ -217,7 +236,7 @@ def edit_post(post_id):
 def delete_post(post_id):
     post = Post.query.get_or_404(post_id)
     user = User.query.get(session['user_id'])
-    
+
     if post.author == user.username or user.is_admin:
         db.session.delete(post)
         db.session.commit()
@@ -231,15 +250,22 @@ def delete_post(post_id):
 def profile_settings():
     user = User.query.get(session['user_id'])
     if request.method == 'POST':
-        user.bio = request.form.get('bio', '')
-        if 'profile_pic' in request.files:
-            file = request.files['profile_pic']
-            if file and file.filename != '':
-                upload_result = cloudinary.uploader.upload(file)
-                user.profile_pic = upload_result['secure_url']
-        db.session.commit()
-        flash("Profile updated!")
-        return redirect(url_for('dashboard'))
+        try:
+            user.bio = request.form.get('bio', '')
+            if 'profile_pic' in request.files:
+                file = request.files['profile_pic']
+                if file and file.filename != '':
+                    upload_result = cloudinary.uploader.upload(file)
+                    user.profile_pic = upload_result.get('secure_url')
+            db.session.commit()
+            flash("Profile updated!")
+            return redirect(url_for('dashboard'))
+        except Exception as e:
+            db.session.rollback()
+            print(f"DEBUG PROFILE ERROR: {str(e)}")
+            flash("Failed to update profile.")
+            return redirect(url_for('profile_settings'))
+
     return render_template('profile_settings.html', user=user)
 
 @app.route('/post/<slug>')
@@ -251,6 +277,31 @@ def view_post(slug):
 def logout():
     session.pop('user_id', None)
     return redirect(url_for('login'))
+
+@app.route('/react/<int:post_id>', methods=['POST'])
+@login_required
+def react(post_id):
+    post = Post.query.get_or_404(post_id)
+    reaction_type = request.form.get('type')
+    user_id = session.get('user_id')
+
+    # I-check kon ang user nakahatag na ba og reaction kaniadto
+    existing_reaction = Reaction.query.filter_by(post_id=post_id, user_id=user_id).first()
+
+    if existing_reaction:
+        if existing_reaction.type == reaction_type:
+            # Kon parehas ang reaction, i-remove (toggle off)
+            db.session.delete(existing_reaction)
+        else:
+            # Kon lahi ang reaction, i-update
+            existing_reaction.type = reaction_type
+    else:
+        # Kon wala pa, paghimo og bag-o
+        new_reaction = Reaction(post_id=post_id, user_id=user_id, type=reaction_type)
+        db.session.add(new_reaction)
+
+    db.session.commit()
+    return jsonify({"success": True, "count": post.reactions.count()})
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
