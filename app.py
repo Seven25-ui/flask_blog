@@ -13,15 +13,12 @@ app = Flask(__name__, instance_relative_config=True)
 app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey")
 os.makedirs(app.instance_path, exist_ok=True)
 
-# --- CLOUDINARY CONFIG (OPTIMIZED) ---
-# Mogamit ra kini sa CLOUDINARY_URL gikan sa environment (Render o Local Export)
+# --- CLOUDINARY CONFIG ---
 cloudinary_url = os.environ.get('CLOUDINARY_URL')
 if cloudinary_url:
     cloudinary.config(cloudinary_url=cloudinary_url, secure=True)
 else:
-    # Optional: I-set ang hardcoded kadiyot para sa local test kon dili ka mugamit og export
-    # cloudinary.config(cloud_name="dzwn8b3ax", api_key="179391797818159", api_secret="DfNDDAsqR2dAy4KH8sZa2_P7x2g", secure=True)
-    print("WARNING: CLOUDINARY_URL not found. Profile uploads will fail.")
+    print("WARNING: CLOUDINARY_URL not found.")
 
 # --- DATABASE CONFIG ---
 if os.environ.get('DATABASE_URL'):
@@ -65,6 +62,7 @@ class Reaction(db.Model):
     post = db.relationship('Post', backref=db.backref('reactions', lazy='dynamic'))
     user = db.relationship('User', backref=db.backref('reactions', lazy='dynamic'))
 
+# --- DATABASE INITIALIZATION ---
 with app.app_context():
     db.create_all()
 
@@ -91,13 +89,19 @@ def utility_processor():
         return max(1, words // 200)
     return dict(get_user_by_username=get_user_by_username, get_read_time=get_read_time)
 
-# --- ROUTES ---
+# --- SPECIAL ROUTES (FOR FIXING) ---
+@app.route('/force-reset-db')
+def force_reset():
+    db.drop_all()
+    db.create_all()
+    return "Database has been fully reset! Please register again."
+
+# --- MAIN ROUTES ---
 @app.route('/')
 @app.route('/public')
 def public_home():
     posts = Post.query.filter_by(approved=True).order_by(Post.created_at.desc()).all()
-    user_id = session.get('user_id')
-    user = User.query.get(user_id) if user_id else None
+    user = User.query.get(session['user_id']) if session.get('user_id') else None
     return render_template('home_public.html', posts=posts, user=user)
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -108,10 +112,10 @@ def register():
             flash("Username exists!")
             return redirect(url_for('register'))
         hashed_pw = generate_password_hash(request.form['password'])
-        is_admin = not User.query.first() # First user becomes admin
+        is_admin = not User.query.first()
         db.session.add(User(username=username, password=hashed_pw, is_admin=is_admin))
         db.session.commit()
-        flash("Registered successfully! Please login.")
+        flash("Registered successfully!")
         return redirect(url_for('login'))
     return render_template('register.html')
 
@@ -129,6 +133,9 @@ def login():
 @login_required
 def dashboard():
     user = User.query.get(session['user_id'])
+    if not user:
+        session.clear()
+        return redirect(url_for('login'))
     if user.is_admin:
         posts = Post.query.order_by(Post.created_at.desc()).all()
     else:
@@ -144,8 +151,12 @@ def create_post():
         content = request.form.get('content')
         tags = request.form.get('tags', '')
         slug = make_slug(title)
-        media_url, m_type = None, None
+        
+        if Post.query.filter_by(slug=slug).first():
+            flash("Error: Title already exists. Change it slightly.")
+            return redirect(url_for('create_post'))
 
+        media_url, m_type = None, None
         if 'media_file' in request.files:
             file = request.files['media_file']
             if file and file.filename != '':
@@ -162,11 +173,11 @@ def create_post():
                         approved=user.is_admin, tags=tags, media_file=media_url, media_type=m_type)
             db.session.add(post)
             db.session.commit()
-            flash("Post submitted successfully!")
+            flash("Post submitted!")
             return redirect(url_for('dashboard'))
         except Exception as e:
             db.session.rollback()
-            flash("Database error: Slug might already exist.")
+            flash("Database error occurred.")
             return redirect(url_for('create_post'))
     return render_template('create_post.html', post=None)
 
@@ -182,9 +193,8 @@ def profile_settings():
                 if file and file.filename != '':
                     upload_result = cloudinary.uploader.upload(file)
                     user.profile_pic = upload_result.get('secure_url')
-            
             db.session.commit()
-            flash("Profile updated successfully!")
+            flash("Profile updated!")
             return redirect(url_for('dashboard'))
         except Exception as e:
             db.session.rollback()
@@ -196,25 +206,6 @@ def profile_settings():
 def view_post(slug):
     post = Post.query.filter_by(slug=slug, approved=True).first_or_404()
     return render_template('view_post.html', post=post)
-
-@app.route('/react/<int:post_id>', methods=['POST'])
-@login_required
-def react(post_id):
-    post = Post.query.get_or_404(post_id)
-    reaction_type = request.form.get('type')
-    user_id = session.get('user_id')
-    existing = Reaction.query.filter_by(post_id=post_id, user_id=user_id).first()
-
-    if existing:
-        if existing.type == reaction_type:
-            db.session.delete(existing)
-        else:
-            existing.type = reaction_type
-    else:
-        db.session.add(Reaction(post_id=post_id, user_id=user_id, type=reaction_type))
-
-    db.session.commit()
-    return jsonify({"success": True, "count": post.reactions.count()})
 
 @app.route('/logout')
 def logout():
