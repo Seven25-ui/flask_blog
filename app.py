@@ -89,13 +89,6 @@ def utility_processor():
         return max(1, words // 200)
     return dict(get_user_by_username=get_user_by_username, get_read_time=get_read_time)
 
-# --- SPECIAL ROUTES (FOR FIXING) ---
-@app.route('/force-reset-db')
-def force_reset():
-    db.drop_all()
-    db.create_all()
-    return "Database has been fully reset! Please register again."
-
 # --- MAIN ROUTES ---
 @app.route('/')
 @app.route('/public')
