@@ -19,6 +19,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 # --- FILE UPLOAD CONFIG ---
+# Gigamit nato ang absolute path para dili mawala ang media files
 UPLOAD_FOLDER = os.path.join(app.instance_path, 'uploads')
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'mp4', 'mov', 'webm'}
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -209,8 +210,10 @@ def reject_post(post_id):
     db.session.commit()
     return redirect(url_for('dashboard'))
 
-@app.route('/media/<filename>')
+# --- FIX: Media Serving Route ---
+@app.route('/media/<path:filename>')
 def uploaded_file(filename):
+    # Siguroha nga husto ang folder path padulong sa instance/uploads
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 @app.route('/dashboard')
