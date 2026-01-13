@@ -73,7 +73,7 @@ def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         if not session.get('user_id'):
-            flash("Please login first!")
+            flash("Please log in to continue.")
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated
@@ -100,13 +100,14 @@ def register():
     if request.method == 'POST':
         username = request.form['username']
         if User.query.filter_by(username=username).first():
-            flash("Username exists!")
+            flash("Username already exists. Please choose another.")
             return redirect(url_for('register'))
         hashed_pw = generate_password_hash(request.form['password'])
+        # First user is admin
         is_admin = not User.query.first()
         db.session.add(User(username=username, password=hashed_pw, is_admin=is_admin))
         db.session.commit()
-        flash("Registered successfully!")
+        flash("Registration successful! Please sign in.")
         return redirect(url_for('login'))
     return render_template('register.html')
 
@@ -117,7 +118,7 @@ def login():
         if user and check_password_hash(user.password, request.form['password']):
             session['user_id'] = user.id
             return redirect(url_for('dashboard'))
-        flash("Invalid credentials")
+        flash("Invalid username or password.")
     return render_template('login.html')
 
 @app.route('/dashboard')
@@ -144,7 +145,7 @@ def create_post():
         slug = make_slug(title)
 
         if Post.query.filter_by(slug=slug).first():
-            flash("Error: Title already exists.")
+            flash("Error: This title is already taken.")
             return redirect(url_for('create_post'))
 
         media_url, m_type = None, None
@@ -159,10 +160,15 @@ def create_post():
                     approved=user.is_admin, tags=tags, media_file=media_url, media_type=m_type)
         db.session.add(post)
         db.session.commit()
+        
+        if user.is_admin:
+            flash("Post published successfully!")
+        else:
+            flash("Post submitted! Waiting for admin approval.")
+            
         return redirect(url_for('dashboard'))
     return render_template('create_post.html', post=None)
 
-# --- ADDED ROUTES TO FIX BUILDERROR ---
 @app.route('/approve/<int:post_id>')
 @login_required
 def approve_post(post_id):
@@ -172,6 +178,7 @@ def approve_post(post_id):
         if post:
             post.approved = True
             db.session.commit()
+            flash("Post has been approved and published.")
     return redirect(url_for('dashboard'))
 
 @app.route('/reject/<int:post_id>')
@@ -183,6 +190,7 @@ def reject_post(post_id):
         if post:
             db.session.delete(post)
             db.session.commit()
+            flash("Post rejected and removed.")
     return redirect(url_for('dashboard'))
 
 @app.route('/edit/<int:post_id>', methods=['GET', 'POST'])
@@ -196,6 +204,7 @@ def edit_post(post_id):
         post.title = request.form.get('title')
         post.content = request.form.get('content')
         db.session.commit()
+        flash("Post updated successfully!")
         return redirect(url_for('dashboard'))
     return render_template('create_post.html', post=post)
 
@@ -207,6 +216,7 @@ def delete_post(post_id):
     if post and (post.author == user.username or user.is_admin):
         db.session.delete(post)
         db.session.commit()
+        flash("Post deleted successfully.")
     return redirect(url_for('dashboard'))
 
 @app.route('/post/<slug>')
@@ -227,12 +237,14 @@ def profile_settings():
                 res = cloudinary.uploader.upload(file)
                 user.profile_pic = res.get('secure_url')
         db.session.commit()
+        flash("Profile updated successfully!")
         return redirect(url_for('dashboard'))
     return render_template('profile_settings.html', user=user)
 
 @app.route('/logout')
 def logout():
     session.clear()
+    flash("You have been logged out.")
     return redirect(url_for('login'))
 
 if __name__ == "__main__":

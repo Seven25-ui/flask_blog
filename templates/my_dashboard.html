@@ -41,13 +41,13 @@
 <div class="max-w-4xl mx-auto p-4 mt-2">
     <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-2xl shadow-lg mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
         <div>
-            <h2 class="text-xl sm:text-2xl font-bold mb-1">Maayong adlaw, {{ user.username }}! 👋</h2>
+            <h2 class="text-xl sm:text-2xl font-bold mb-1">Welcome back, {{ user.username }}! 👋</h2>
             <p class="text-blue-100 text-sm sm:text-base opacity-90">
-                {% if user.is_admin %} Admin Account: I-manage ang komunidad. {% else %} Padayon sa pag-create og nindot nga sulod! {% endif %}
+                {% if user.is_admin %} Admin Account: Manage the community and reviews. {% else %} Keep creating amazing content! {% endif %}
             </p>
         </div>
         <a href="{{ url_for('create_post') }}" class="w-full sm:w-auto px-6 py-3 bg-white text-blue-600 font-bold rounded-xl shadow-md hover:bg-blue-50 transition text-center">
-            + New Post
+            + Create New Post
         </a>
     </div>
 
@@ -70,7 +70,7 @@
                                 📅 {{ post.created_at.strftime('%b %d, %Y') }}
                                 <span class="text-blue-500 font-medium">⏱️ {{ get_read_time(post.content) }} min read</span>
                                 {% if user.is_admin %}
-                                <span class="text-purple-500 font-bold ml-1">👤 By: {{ post.author }}</span>
+                                <span class="text-purple-500 font-bold ml-1">👤 Author: {{ post.author }}</span>
                                 {% endif %}
                             </p>
                         </div>
@@ -130,8 +130,8 @@
         {% endfor %}
     {% else %}
         <div class="bg-white dark:bg-gray-800 p-10 rounded-2xl shadow text-center border-2 border-dashed border-gray-200 dark:border-gray-700">
-            <p class="text-gray-500 mb-4 font-medium">Wala pa kayo'y post. Sugdi na!</p>
-            <a href="{{ url_for('create_post') }}" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg transition transform active:scale-95 inline-block">✨ Create First Post</a>
+            <p class="text-gray-500 mb-4 font-medium">You haven't posted anything yet. Get started!</p>
+            <a href="{{ url_for('create_post') }}" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg transition transform active:scale-95 inline-block">✨ Create Your First Post</a>
         </div>
     {% endif %}
 </div>
@@ -162,7 +162,7 @@
     };
 
     function confirmDelete(event) {
-        if (confirm('Sigurado ka nga gusto nimo i-delete kini? Dili na kini mabalik.')) {
+        if (confirm('Are you sure you want to delete this? This action cannot be undone.')) {
             sessionStorage.setItem('action', 'deleted');
             return true;
         }

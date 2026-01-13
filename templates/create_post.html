@@ -3,75 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ 'Edit Post' if post else 'Create Post' }} • Seven33 Blog</title>
+    <title>{{ 'Edit Post' if post else 'Create New Post' }} • Seven33 Blog</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>tailwind.config = { darkMode: 'class' };</script>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
 
 <header class="flex justify-between items-center p-4 bg-white dark:bg-gray-800 shadow sticky top-0 z-50">
-    <div class="font-bold text-lg">{{ '✏️ Edit Post' if post else '✨ Create Post' }}</div>
+    <div class="font-bold text-lg">{{ '✏️ Edit Post' if post else '✨ Create New Post' }}</div>
     <div class="flex items-center space-x-4">
         <a href="{{ url_for('dashboard') }}" class="text-blue-600 dark:text-blue-400 hover:underline font-medium">← Dashboard</a>
-        <span id="darkToggle" class="cursor-pointer px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition">💡</span>
+        <span id="darkToggle" class="cursor-pointer px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition">💡</span>
     </div>
 </header>
 
 <div class="max-w-3xl mx-auto p-6 bg-white dark:bg-gray-800 rounded-2xl shadow-lg mt-6 mb-10 transition-colors duration-300 border border-gray-100 dark:border-gray-700">
     <form method="POST" enctype="multipart/form-data" class="space-y-5">
         <div>
-            <label class="block text-sm font-bold mb-2 text-gray-500 uppercase tracking-wider">Title</label>
-            <input type="text" name="title" placeholder="Enter post title..." required
+            <label class="block text-xs font-bold mb-2 text-gray-400 uppercase tracking-widest">Post Title</label>
+            <input type="text" name="title" placeholder="Give your story a title..." required
                    value="{{ post.title if post else '' }}"
-                   class="w-full p-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 outline-none transition">
+                   class="w-full p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 outline-none transition">
         </div>
 
         <div>
-            <label class="block text-sm font-bold mb-2 text-gray-500 uppercase tracking-wider">Content</label>
-            <textarea name="content" placeholder="Write your thoughts here..." rows="8" required
-                      class="w-full p-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 outline-none transition">{{ post.content if post else '' }}</textarea>
+            <label class="block text-xs font-bold mb-2 text-gray-400 uppercase tracking-widest">Content</label>
+            <textarea name="content" placeholder="Share your thoughts with the community..." rows="10" required
+                      class="w-full p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 outline-none transition">{{ post.content if post else '' }}</textarea>
         </div>
 
-        <div class="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-600">
-            <label class="block text-sm font-bold mb-2 text-gray-500 uppercase tracking-wider">
-                {{ 'Replace Media' if post and post.media_file else 'Add Media' }} (Image or Video)
+        <div class="p-4 bg-blue-50/50 dark:bg-gray-700/50 rounded-xl border-2 border-dashed border-blue-200 dark:border-gray-600">
+            <label class="block text-xs font-bold mb-3 text-blue-600 dark:text-blue-400 uppercase tracking-widest">
+                {{ 'Replace Media' if post and post.media_file else 'Attach Image or Video' }}
             </label>
-            
+
             {% if post and post.media_file %}
             <div class="mb-4">
-                <p class="text-xs text-gray-500 mb-2">Current Media:</p>
+                <p class="text-[10px] font-bold text-gray-400 uppercase mb-2">Current Media Preview:</p>
                 {% if post.media_type == 'video' %}
-                    <video class="h-32 rounded-lg shadow-sm" src="{{ post.media_file }}" controls></video>
+                    <video class="h-32 rounded-lg shadow-sm border border-white dark:border-gray-600" src="{{ post.media_file }}" controls></video>
                 {% else %}
-                    <img class="h-32 rounded-lg shadow-sm" src="{{ post.media_file }}" alt="Current post image">
+                    <img class="h-32 rounded-lg shadow-sm border border-white dark:border-gray-600" src="{{ post.media_file }}" alt="Current post image">
                 {% endif %}
             </div>
             {% endif %}
 
             <input type="file" name="media_file" accept="image/*,video/*"
-                   class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-gray-600 dark:file:text-gray-200">
-            <p class="mt-2 text-xs text-gray-400 italic">Supported: JPG, PNG, WEBP, MP4, MOV</p>
+                   class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-700 transition cursor-pointer">
+            <p class="mt-2 text-[11px] text-gray-400 italic">Recommended formats: JPG, PNG, WEBP, MP4</p>
         </div>
 
         <div>
-            <label class="block text-sm font-bold mb-2 text-gray-500 uppercase tracking-wider">Tags</label>
-            <input type="text" name="tags" placeholder="life, motivation, tech"
+            <label class="block text-xs font-bold mb-2 text-gray-400 uppercase tracking-widest">Tags (Optional)</label>
+            <input type="text" name="tags" placeholder="e.g. lifestyle, technology, news"
                    value="{{ post.tags if post else '' }}"
-                   class="w-full p-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 outline-none transition">
+                   class="w-full p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 outline-none transition">
         </div>
 
-        <div class="pt-4 flex gap-3">
-            <button type="submit" class="flex-1 px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition shadow-md transform active:scale-95">
-                {{ 'Update Post' if post else 'Publish Post' }}
+        <div class="pt-4 flex flex-col sm:flex-row gap-3">
+            <button type="submit" class="flex-1 px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl transition shadow-lg shadow-blue-200 dark:shadow-none transform active:scale-95">
+                {{ 'Save Changes' if post else 'Publish Story' }}
             </button>
-            <a href="{{ url_for('dashboard') }}" class="px-8 py-3 bg-gray-200 dark:bg-gray-700 text-center font-bold rounded-xl text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition border-none">
-                Cancel
+            <a href="{{ url_for('dashboard') }}" class="px-8 py-3 bg-gray-200 dark:bg-gray-700 text-center font-bold rounded-xl text-gray-600 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition">
+                Discard
             </a>
         </div>
     </form>
 </div>
 
 <script>
+    // Dark Mode Persistence
     const darkToggle = document.getElementById('darkToggle');
     if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
     darkToggle.addEventListener('click', () => {
