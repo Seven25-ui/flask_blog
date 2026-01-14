@@ -65,9 +65,16 @@
                 </div>
 
                 {% if post.media_file %}
-                    <div class="relative group">
-                        <img src="{{ post.media_file }}" class="w-full object-cover max-h-[500px]">
-                        <div class="absolute inset-0 bg-black/5 group-hover:bg-transparent transition"></div>
+                    <div class="relative group bg-black">
+                        {% if post.media_type == 'video' %}
+                            <video controls class="w-full max-h-[500px] outline-none">
+                                <source src="{{ post.media_file }}" type="video/mp4">
+                                Your browser does not support the video tag.
+                            </video>
+                        {% else %}
+                            <img src="{{ post.media_file }}" class="w-full object-cover max-h-[500px]">
+                        {% endif %}
+                        <div class="absolute inset-0 bg-black/5 group-hover:bg-transparent transition pointer-events-none"></div>
                     </div>
                 {% endif %}
 
@@ -117,7 +124,6 @@
     </main>
 
     <script>
-        // ... (Kini nga part parehas ra sa imong original script, wala ni nausab ang logic) ...
         function sendReaction(postId, type) {
             fetch(`/react/${postId}/${type}`, { method: 'POST' })
             .then(res => res.json())
@@ -144,7 +150,7 @@
                 const list = document.getElementById(`comment-list-${postId}`);
                 list.innerHTML += `
                     <div class="flex gap-2 items-start animate-bounce">
-                        <img src="${data.profile_pic}" class="w-7 h-7 rounded-full object-cover mt-1">
+                        <img src="${data.user_pic}" class="w-7 h-7 rounded-full object-cover mt-1">
                         <div class="bg-blue-50 dark:bg-blue-900/40 px-3 py-2 rounded-2xl text-xs flex-1 border border-blue-100 dark:border-blue-800">
                             <span class="font-black">@${data.username}</span>
                             <p class="mt-0.5">${data.content}</p>
