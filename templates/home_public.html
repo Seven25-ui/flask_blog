@@ -54,9 +54,12 @@
 
             <div class="p-5 flex items-start gap-3">
                 {% set post_user = get_user_by_username(post.author) %}
-                <img src="{{ post_user.profile_pic if post_user and post_user.profile_pic else 'https://res.cloudinary.com/demo/image/upload/d_avatar.png/v1/avatar.png' }}"
-                     onerror="this.src='https://ui-avatars.com/api/?name={{ post.author }}&background=0D8ABC&color=fff'"
-                     class="w-11 h-11 rounded-full object-cover border dark:border-gray-700">
+                <a href="{{ url_for('view_profile', username=post.author) }}">
+                    <img src="{{ post_user.profile_pic if post_user and post_user.profile_pic else 'https://res.cloudinary.com/demo/image/upload/d_avatar.png/v1/avatar.png' }}"
+                         onerror="this.src='https://ui-avatars.com/api/?name={{ post.author }}&background=0D8ABC&color=fff'"
+                         class="w-11 h-11 rounded-full object-cover border dark:border-gray-700 hover:opacity-80 transition">
+                </a>
+                
                 <div class="flex-1">
                     <h2 class="text-lg font-bold leading-tight">
                         <a href="{{ url_for('view_post', slug=post.slug) }}" class="hover:text-blue-600 transition">
@@ -64,7 +67,11 @@
                         </a>
                     </h2>
                     <p class="text-[11px] text-gray-400 uppercase font-bold tracking-widest mt-0.5">
-                        By <span class="text-blue-500">{{ post.author }}</span> • {{ post.created_at.strftime('%b %d, %Y') }}
+                        By 
+                        <a href="{{ url_for('view_profile', username=post.author) }}" class="text-blue-500 hover:underline">
+                            @{{ post.author }}
+                        </a> 
+                        • {{ post.created_at.strftime('%b %d, %Y') }}
                     </p>
                 </div>
             </div>
@@ -104,7 +111,7 @@
                 <div class="flex items-center">
                     {% if user %}
                     <div class="relative inline-block">
-                        <button onmouseenter="showPopup({{ post.id }})" 
+                        <button onmouseenter="showPopup({{ post.id }})"
                                 onmouseleave="hidePopup({{ post.id }})"
                                 class="reaction-btn flex items-center gap-2 px-4 py-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 border dark:border-gray-600 transition">
                             <span id="btn-emoji-{{ post.id }}">👍</span>
@@ -157,19 +164,15 @@
     }
 
     function sendReaction(postId, type) {
-        // Send as POST to match your app.py route: /react/<post_id>/<type>
         fetch(`/react/${postId}/${type}`, { method: 'POST' })
         .then(res => res.json())
         .then(data => {
             if (data.count !== undefined) {
                 const summary = document.getElementById(`summary-${postId}`);
                 summary.innerHTML = `<span class="flex items-center gap-1">✨ ${data.count} Reactions</span>`;
-                
-                // Visual feedback
                 const emojiMap = {'like':'👍','love':'❤️','haha':'😂','sad':'😢','angry':'😡'};
                 document.getElementById(`btn-emoji-${postId}`).innerText = emojiMap[type];
                 document.getElementById('popup-'+postId).classList.remove('show');
-                
                 showToast(`Reaction updated to ${emojiMap[type]}`);
             }
         })

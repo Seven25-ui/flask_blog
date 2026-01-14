@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ target_user.username }}'s Profile • Seven33</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>tailwind.config = { darkMode: 'class' };</script>
+    <style>
+        .profile-card { transition: all 0.3s ease; }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300 min-h-screen">
+
+    <header class="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-50 border-b dark:border-gray-700">
+        <div class="max-w-4xl mx-auto p-4 flex justify-between items-center">
+            <a href="{{ url_for('public_home') }}" class="text-xl font-black tracking-tighter text-blue-600 dark:text-blue-400">SEVEN33</a>
+            <div class="flex items-center space-x-4">
+                <nav class="flex space-x-4 text-sm font-medium">
+                    <a href="{{ url_for('public_home') }}" class="hover:text-blue-600 transition">Home</a>
+                    {% if user %}
+                        <a href="{{ url_for('dashboard') }}" class="hover:text-blue-600 transition">Dashboard</a>
+                    {% else %}
+                        <a href="{{ url_for('login') }}" class="hover:text-blue-600">Login</a>
+                    {% endif %}
+                </nav>
+                <button id="darkToggle" class="p-2 bg-gray-100 dark:bg-gray-700 rounded-full transition">💡</button>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-4xl mx-auto py-10 px-4">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-8 mb-8 profile-card">
+            <div class="flex flex-col md:flex-row items-center gap-8">
+                <div class="relative">
+                    <img src="{{ target_user.profile_pic }}" 
+                         class="w-32 h-32 rounded-full object-cover border-4 border-blue-500 shadow-lg">
+                    <span class="absolute bottom-2 right-2 bg-green-500 w-5 h-5 rounded-full border-4 border-white dark:border-gray-800"></span>
+                </div>
+                
+                <div class="flex-1 text-center md:text-left">
+                    <h1 class="text-3xl font-black text-gray-800 dark:text-white">@{{ target_user.username }}</h1>
+                    <p class="text-gray-600 dark:text-gray-400 mt-2 leading-relaxed italic">
+                        {{ target_user.bio if target_user.bio else "This user hasn't written a bio yet. 👋" }}
+                    </p>
+                    
+                    <div class="mt-4 flex flex-wrap justify-center md:justify-start gap-3">
+                        {% if user and user.username == target_user.username %}
+                        <a href="{{ url_for('profile_settings') }}" 
+                           class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-full transition text-sm shadow-md">
+                           ✏️ Edit Profile
+                        </a>
+                        {% endif %}
+                        <span class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-xs font-bold rounded-full flex items-center">
+                            Joined {{ target_user.created_at.strftime('%B %Y') if target_user.created_at else 'Recently' }}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="bg-blue-50 dark:bg-blue-900/20 px-8 py-4 rounded-2xl text-center border border-blue-100 dark:border-blue-800">
+                    <span class="block text-3xl font-black text-blue-600 dark:text-blue-400">{{ posts|length }}</span>
+                    <span class="text-xs uppercase font-bold text-blue-400 tracking-widest">Stories</span>
+                </div>
+            </div>
+        </div>
+
+        <h3 class="text-xl font-bold mb-6 flex items-center gap-2">
+            <span class="bg-blue-600 w-2 h-6 rounded-full"></span> 
+            Latest Stories by {{ target_user.username }}
+        </h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {% for post in posts %}
+            <a href="{{ url_for('view_post', slug=post.slug) }}" class="group">
+                <div class="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-xl hover:-translate-y-1 transition-all h-full">
+                    {% if post.media_file %}
+                        <div class="overflow-hidden rounded-xl mb-4 h-44 bg-gray-100 dark:bg-gray-900">
+                            <img src="{{ post.media_file }}" class="w-full h-full object-cover group-hover:scale-110 transition duration-500">
+                        </div>
+                    {% endif %}
+                    <h4 class="font-bold text-lg group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">{{ post.title }}</h4>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm mt-2 line-clamp-2">
+                        {{ post.content|striptags|truncate(100) }}
+                    </p>
+                    <div class="mt-4 flex justify-between items-center text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                        <span>{{ post.created_at.strftime('%b %d, %Y') }}</span>
+                        <span class="text-blue-500">Read More →</span>
+                    </div>
+                </div>
+            </a>
+            {% else %}
+            <div class="col-span-full py-20 text-center bg-white dark:bg-gray-800 rounded-3xl border border-dashed border-gray-300 dark:border-gray-600">
+                <p class="text-gray-400 font-bold uppercase tracking-widest">No stories published yet. 😴</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="mt-10 text-center">
+            <a href="{{ url_for('public_home') }}" class="text-blue-500 font-bold hover:underline">← Back to Feed</a>
+        </div>
+    </div>
+
+    <script>
+        // Dark Mode Logic
+        const darkToggle = document.getElementById('darkToggle');
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.documentElement.classList.add('dark');
+            darkToggle.innerText = '☀️';
+        }
+
+        darkToggle.addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark');
+            const isDark = document.documentElement.classList.contains('dark');
+            localStorage.setItem('darkMode', isDark);
+            darkToggle.innerText = isDark ? '☀️' : '💡';
+        });
+    </script>
+</body>
+</html>

@@ -3,81 +3,83 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Profile Settings • Seven33 Blog</title>
+    <title>Profile Settings • Seven33</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>tailwind.config = { darkMode: 'class' };</script>
 </head>
-<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300 min-h-screen">
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300 min-h-screen p-4 md:p-8">
 
-<header class="bg-white dark:bg-gray-800 shadow sticky top-0 z-50">
-    <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
-        <h1 class="text-xl font-bold text-blue-600">⚙️ Settings</h1>
-        <div class="flex items-center gap-4">
-            <a href="{{ url_for('dashboard') }}" class="text-blue-600 dark:text-blue-400 hover:underline font-medium">← Dashboard</a>
-            <button id="darkToggle" class="p-2 bg-gray-100 dark:bg-gray-700 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition">💡</button>
-        </div>
+    <div class="max-w-lg mx-auto flex justify-end mb-4">
+        <button id="darkToggle" class="p-2 bg-white dark:bg-gray-800 shadow-sm border dark:border-gray-700 rounded-full transition">💡</button>
     </div>
-</header>
 
-<div class="max-w-2xl mx-auto p-6 mt-6">
-    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-10 border border-gray-100 dark:border-gray-700">
-        <form method="POST" enctype="multipart/form-data" class="space-y-6">
+    <div class="max-w-lg mx-auto bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-700">
+        <h2 class="text-3xl font-black text-gray-800 dark:text-white mb-6 text-center tracking-tighter">⚙️ SETTINGS</h2>
 
-            <div class="flex flex-col items-center gap-4">
-                <div class="relative group">
-                    <img id="preview" src="{{ user.profile_pic if user.profile_pic else 'https://res.cloudinary.com/demo/image/upload/d_avatar.png/v1/avatar.png' }}"
-                         class="w-32 h-32 rounded-full object-cover ring-4 ring-blue-500/20 shadow-lg"
-                         onerror="this.src='https://ui-avatars.com/api/?name={{ user.username }}&background=0D8ABC&color=fff'">
-
-                    <label class="absolute bottom-0 right-0 bg-blue-600 text-white p-2 rounded-full cursor-pointer hover:bg-blue-700 shadow-lg transition transform hover:scale-110">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                        </svg>
-                        <input type="file" name="profile_pic" class="hidden" accept="image/*" onchange="previewImage(event)">
-                    </label>
-                </div>
-                <p class="text-sm font-bold text-gray-500 uppercase tracking-tight">Update Profile Picture</p>
+        <div class="flex flex-col items-center mb-8 pb-6 border-b border-gray-100 dark:border-gray-700">
+            <div class="relative">
+                <img id="preview_img" src="{{ user.profile_pic }}"
+                     alt="Profile Picture"
+                     class="w-32 h-32 rounded-full object-cover border-4 border-blue-500 shadow-md">
+                <span class="absolute bottom-1 right-1 bg-green-500 w-5 h-5 rounded-full border-2 border-white dark:border-gray-800"></span>
             </div>
+            <p class="mt-3 text-sm font-bold text-gray-600 dark:text-gray-300">@{{ user.username }}</p>
+            <p class="text-[10px] text-gray-400 uppercase font-bold tracking-[0.2em] mt-1">Live Preview</p>
+        </div>
 
-            <hr class="border-gray-100 dark:border-gray-700">
+        <form method="POST" enctype="multipart/form-data" class="space-y-6">
+            <div>
+                <label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wide">Profile Picture</label>
+                <input type="file" name="profile_pic" id="profile_input" accept="image/*"
+                       class="w-full p-2 text-xs border border-gray-200 dark:border-gray-600 dark:bg-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-blue-50 dark:file:bg-blue-900/30 file:text-blue-700 dark:file:text-blue-400 hover:file:bg-blue-100 cursor-pointer">
+                <p class="text-[10px] text-gray-400 mt-2 italic">Supported: JPG, PNG, WEBP. Uploaded via Cloudinary.</p>
+            </div>
 
             <div>
-                <label class="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-widest">About Me (Bio)</label>
-                <textarea name="bio" rows="4" placeholder="Tell the world a little bit about yourself..."
-                          class="w-full p-4 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 outline-none transition">{{ user.bio if user.bio else '' }}</textarea>
+                <label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wide">Bio / About Me</label>
+                <textarea name="bio" rows="4" placeholder="Share a little story about yourself..."
+                          class="w-full p-4 border border-gray-200 dark:border-gray-600 dark:bg-gray-700 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition text-gray-700 dark:text-gray-200">{{ user.bio or '' }}</textarea>
+                <p class="text-[10px] text-gray-400 mt-1">This will be displayed on your public profile and posts.</p>
             </div>
 
-            <div class="space-y-3">
-                <button type="submit" class="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-100 dark:shadow-none transition transform active:scale-[0.98]">
-                    💾 Save Profile Settings
-                </button>
-
-                <a href="{{ url_for('dashboard') }}" class="block text-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 font-medium text-sm transition">
-                    Cancel and Go Back
-                </a>
-            </div>
+            <button type="submit"
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-2xl shadow-lg shadow-blue-500/30 transform active:scale-95 transition-all uppercase tracking-widest text-sm">
+                Save Changes
+            </button>
         </form>
+
+        <div class="mt-8 text-center border-t dark:border-gray-700 pt-6">
+            <a href="{{ url_for('dashboard') }}" class="text-blue-500 hover:text-blue-600 font-bold text-sm transition">
+                ← Return to Dashboard
+            </a>
+        </div>
     </div>
-</div>
 
-<script>
-    // Live preview for profile picture selection
-    function previewImage(event) {
-        const reader = new FileReader();
-        reader.onload = function() {
-            const output = document.getElementById('preview');
-            output.src = reader.result;
+    <script>
+        // Preview image before uploading
+        const profileInput = document.getElementById('profile_input');
+        const previewImg = document.getElementById('preview_img');
+
+        profileInput.onchange = evt => {
+            const [file] = profileInput.files;
+            if (file) {
+                previewImg.src = URL.createObjectURL(file);
+            }
         }
-        reader.readAsDataURL(event.target.files[0]);
-    }
 
-    // Dark Mode Toggle Logic
-    const darkToggle = document.getElementById('darkToggle');
-    if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
-    darkToggle.addEventListener('click', () => {
-        document.documentElement.classList.toggle('dark');
-        localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
-    });
-</script>
+        // Dark Mode Logic
+        const darkToggle = document.getElementById('darkToggle');
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.documentElement.classList.add('dark');
+            darkToggle.innerText = '☀️';
+        }
+
+        darkToggle.addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark');
+            const isDark = document.documentElement.classList.contains('dark');
+            localStorage.setItem('darkMode', isDark);
+            darkToggle.innerText = isDark ? '☀️' : '💡';
+        });
+    </script>
 </body>
 </html>
