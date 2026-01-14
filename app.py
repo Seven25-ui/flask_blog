@@ -140,23 +140,47 @@ def public_home():
 def create_post():
     user = db.session.get(User, session['user_id'])
     if request.method == 'POST':
-        title = request.form.get('title')
-        content = request.form.get('content')
-        slug = re.sub(r'[^a-zA-Z0-9 ]', '', title).replace(" ", "-").lower() + "-" + str(int(datetime.utcnow().timestamp()))
-        media_url, media_type = None, None
+        try:
+            title = request.form.get('title')
+            content = request.form.get('content')
+            
+            # Simple slug generator
+            slug = re.sub(r'[^a-zA-Z0-9 ]', '', title).replace(" ", "-").lower() + "-" + str(int(datetime.utcnow().timestamp()))
+            
+            media_url, media_type = None, None
 
-        if 'media_file' in request.files:
-            file = request.files['media_file']
-            if file and file.filename != '':
-                upload_result = cloudinary.uploader.upload(file, resource_type="auto")
-                media_url = upload_result.get('secure_url')
-                media_type = 'video' if 'video' in upload_result.get('resource_type', '') else 'image'
+            # I-check kung naay gi-upload nga file
+            if 'media_file' in request.files:
+                file = request.files['media_file']
+                if file and file.filename != '':
+                    # I-upload sa Cloudinary
+                    # Siguradoha nga husto ang CLOUDINARY_URL sa Render
+                    upload_result = cloudinary.uploader.upload(file, resource_type="auto")
+                    media_url = upload_result.get('secure_url')
+                    media_type = 'video' if 'video' in upload_result.get('resource_type', '') else 'image'
+                    print(f"DEBUG: Cloudinary Upload Success: {media_url}")
 
-        new_post = Post(title=title, content=content, slug=slug, author=user.username,
-                        approved=user.is_admin, media_file=media_url, media_type=media_type)
-        db.session.add(new_post)
-        db.session.commit()
-        return redirect(url_for('dashboard'))
+            new_post = Post(
+                title=title, 
+                content=content, 
+                slug=slug, 
+                author=user.username,
+                approved=user.is_admin, 
+                media_file=media_url, 
+                media_type=media_type
+            )
+            
+            db.session.add(new_post)
+            db.session.commit()
+            flash("Post created successfully!")
+            return redirect(url_for('dashboard'))
+
+        except Exception as e:
+            db.session.rollback() # I-undo ang database changes kung naay error
+            print(f"❌ ERROR ON /CREATE: {str(e)}")
+            flash(f"Error: {str(e)}")
+            return redirect(url_for('create_post'))
+
     return render_template('create_post.html')
 
 @app.route('/dashboard')
