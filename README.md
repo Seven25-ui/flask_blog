@@ -95,3 +95,4 @@ Make changes / improvements
 Create a pull request
 License
 MIT License — free to use and modify.
+# my-flask-blog
