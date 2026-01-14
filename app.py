@@ -15,11 +15,12 @@ app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey")
 os.environ["CLOUDINARY_URL"] = "cloudinary://179391797818159:DfNDDAsqR2dAy4KH8sZa2_P7x2g@dzwn8b3ax"
 cloudinary.config(secure=True)
 
-# --- DATABASE CONFIG (MAO NI ANG IMPORTANTE) ---
+# --- DATABASE CONFIG (LIG-ON NGA VERSION) ---
+# Siguroha nga ang 'DATABASE_URL' sa Render Dashboard eksakto ang spelling
 database_url = os.environ.get('DATABASE_URL')
 
-if database_url:
-    # SQLALCHEMY 2.0 FIX: Kinahanglan 'postgresql://' dili 'postgres://'
+if database_url and "postgresql" in database_url or database_url and "postgres" in database_url:
+    # SQLAlchemy 2.0+ kinahanglan postgresql:// imbes nga postgres://
     if database_url.startswith("postgres://"):
         database_url = database_url.replace("postgres://", "postgresql://", 1)
     
@@ -28,15 +29,11 @@ if database_url:
         "connect_args": {"sslmode": "require"},
         "pool_pre_ping": True,
     }
-    # Makita ni nimo sa Render Dashboard > Logs
-    print("🚀 INFO: NAGGAMIT KITA OG POSTGRESQL (SAFE ANG DATA!)")
+    print("✅ RENDER LOG: CONNECTED TO POSTGRESQL!")
 else:
+    # Kung wala gyud ma-detect ang DATABASE_URL
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///blog.db'
-    print("⚠️ WARNING: NAGGAMIT KITA OG SQLITE (MAPAPAS ANG DATA!)")
-
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db = SQLAlchemy(app)
-
+    print("⚠️ RENDER LOG: DATABASE_URL NOT FOUND! USING SQLITE...")
 
 # --- MODELS ---
 class Notification(db.Model):
