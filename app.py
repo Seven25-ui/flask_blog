@@ -9,25 +9,30 @@ import cloudinary
 import cloudinary.uploader
 
 app = Flask(__name__)
-# Mas maayo kung naa ni sa Render Environment Variables
 app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey")
 
 # --- CLOUDINARY CONFIG ---
-# I-delete ni nga line kung na-add na nimo ang CLOUDINARY_URL sa Render Dashboard
 os.environ["CLOUDINARY_URL"] = "cloudinary://179391797818159:DfNDDAsqR2dAy4KH8sZa2_P7x2g@dzwn8b3ax"
 cloudinary.config(secure=True)
 
-# --- DATABASE CONFIG ---
-if os.environ.get('DATABASE_URL'):
-    # Fix para sa "postgres://" vs "postgresql://"
-    database_url = os.environ.get('DATABASE_URL').replace("postgres://", "postgresql://", 1)
+# --- DATABASE CONFIG (MAO NI ANG IMPORTANTE) ---
+database_url = os.environ.get('DATABASE_URL')
+
+if database_url:
+    # SQLALCHEMY 2.0 FIX: Kinahanglan 'postgresql://' dili 'postgres://'
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
+    
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
         "connect_args": {"sslmode": "require"},
         "pool_pre_ping": True,
     }
+    # Makita ni nimo sa Render Dashboard > Logs
+    print("🚀 INFO: NAGGAMIT KITA OG POSTGRESQL (SAFE ANG DATA!)")
 else:
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///blog.db'
+    print("⚠️ WARNING: NAGGAMIT KITA OG SQLITE (MAPAPAS ANG DATA!)")
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
@@ -39,7 +44,7 @@ class Notification(db.Model):
     recipient_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     sender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=True)
-    type = db.Column(db.String(20)) 
+    type = db.Column(db.String(20))
     is_read = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     sender = db.relationship('User', foreign_keys=[sender_id])
@@ -95,12 +100,10 @@ with app.app_context():
 def utility_processor():
     def get_user_by_username(username):
         return User.query.filter_by(username=username).first()
-
     def get_read_time(content):
         if not content: return 0
         words = len(content.split())
         return max(1, round(words / 200))
-
     def time_ago(dt):
         if not dt: return ""
         now = datetime.utcnow()
@@ -110,7 +113,6 @@ def utility_processor():
         if diff.seconds > 3600: return f"{diff.seconds // 3600}h ago"
         if diff.seconds > 60: return f"{diff.seconds // 60}m ago"
         return "Just now"
-
     return dict(get_user_by_username=get_user_by_username, get_read_time=get_read_time, time_ago=time_ago)
 
 def login_required(f):
@@ -146,10 +148,8 @@ def create_post():
         if 'media_file' in request.files:
             file = request.files['media_file']
             if file and file.filename != '':
-                # I-upload sa Cloudinary as "auto" para dawat image/video
                 upload_result = cloudinary.uploader.upload(file, resource_type="auto")
                 media_url = upload_result.get('secure_url')
-                # I-check kung video ba
                 media_type = 'video' if 'video' in upload_result.get('resource_type', '') else 'image'
 
         new_post = Post(title=title, content=content, slug=slug, author=user.username,
@@ -175,22 +175,16 @@ def add_comment(post_id):
     data = request.get_json()
     if not data or not data.get('content'):
         return jsonify({"error": "Empty comment"}), 400
-    
     post = Post.query.get_or_404(post_id)
     new_comment = Comment(post_id=post_id, user_id=session['user_id'], content=data.get('content'))
     db.session.add(new_comment)
     db.session.commit()
     
-    # Notify ang tag-iya sa post
     post_owner = User.query.filter_by(username=post.author).first()
     if post_owner:
         create_notification(post_owner.id, session['user_id'], post.id, 'comment')
 
-    return jsonify({
-        "username": new_comment.user.username,
-        "profile_pic": new_comment.user.profile_pic,
-        "content": new_comment.content
-    })
+    return jsonify({"username": new_comment.user.username, "profile_pic": new_comment.user.profile_pic, "content": new_comment.content})
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -220,7 +214,7 @@ def profile_settings():
         user.bio = request.form.get('bio')
         if 'profile_pic' in request.files:
             file = request.files['profile_pic']
-            if file.filename != '':
+            if file and file.filename != '':
                 res = cloudinary.uploader.upload(file)
                 user.profile_pic = res.get('secure_url')
         db.session.commit()
@@ -233,16 +227,13 @@ def react(post_id, reac_type):
     user_id = session['user_id']
     post = Post.query.get_or_404(post_id)
     existing = Reaction.query.filter_by(post_id=post_id, user_id=user_id).first()
-    
     if existing:
         existing.type = reac_type
     else:
         db.session.add(Reaction(post_id=post_id, user_id=user_id, type=reac_type))
-        # Notify ang tag-iya sa post
         post_owner = User.query.filter_by(username=post.author).first()
         if post_owner:
             create_notification(post_owner.id, user_id, post_id, 'fire')
-            
     db.session.commit()
     return jsonify({"count": Reaction.query.filter_by(post_id=post_id).count()})
 
@@ -270,7 +261,6 @@ def edit_post(post_id):
     if post.author != user.username and not user.is_admin:
         flash("Dili nimo pwede usbon kini nga post!")
         return redirect(url_for('dashboard'))
-
     if request.method == 'POST':
         post.title = request.form.get('title')
         post.content = request.form.get('content')
@@ -281,7 +271,6 @@ def edit_post(post_id):
                 post.media_file = res.get('secure_url')
                 post.media_type = 'video' if 'video' in res.get('resource_type', '') else 'image'
         db.session.commit()
-        flash("Post updated successfully!")
         return redirect(url_for('dashboard'))
     return render_template('create_post.html', post=post)
 
@@ -293,35 +282,16 @@ def delete_post(post_id):
     if post.author == user.username or user.is_admin:
         db.session.delete(post)
         db.session.commit()
-        flash("Post deleted!")
-    else:
-        flash("Wala kay permiso mofuta ani!")
     return redirect(url_for('dashboard'))
 
-@app.route('/approve/<int:post_id>', methods=['GET', 'POST'])
+@app.route('/approve/<int:post_id>')
 @login_required
 def approve_post(post_id):
     user = db.session.get(User, session['user_id'])
-    if not user.is_admin:
-        flash("Admin ra ang naay permiso ani!")
-        return redirect(url_for('dashboard'))
-    post = Post.query.get_or_404(post_id)
-    post.approved = True
-    db.session.commit()
-    flash("Post approved successfully!")
-    return redirect(url_for('dashboard'))
-
-@app.route('/reject/<int:post_id>', methods=['GET', 'POST'])
-@login_required
-def reject_post(post_id):
-    user = db.session.get(User, session['user_id'])
-    if not user.is_admin:
-        flash("Admin ra ang pwede mo-reject!")
-        return redirect(url_for('dashboard'))
-    post = Post.query.get_or_404(post_id)
-    db.session.delete(post)
-    db.session.commit()
-    flash("Post rejected and deleted.")
+    if user.is_admin:
+        post = Post.query.get_or_404(post_id)
+        post.approved = True
+        db.session.commit()
     return redirect(url_for('dashboard'))
 
 @app.route('/search')
@@ -334,8 +304,7 @@ def search():
 @login_required
 def notifications():
     notifs = Notification.query.filter_by(recipient_id=session['user_id']).order_by(Notification.created_at.desc()).all()
-    for n in notifs:
-        n.is_read = True
+    for n in notifs: n.is_read = True
     db.session.commit()
     return render_template('notifications.html', notifications=notifs)
 
@@ -352,12 +321,7 @@ def send_message():
     new_msg = ChatMessage(user_id=session['user_id'], message=data['message'])
     db.session.add(new_msg)
     db.session.commit()
-
-    return jsonify({
-        'username': User.query.get(session['user_id']).username,
-        'profile_pic': User.query.get(session['user_id']).profile_pic,
-        'message': new_msg.message
-    })
+    return jsonify({'username': User.query.get(session['user_id']).username, 'profile_pic': User.query.get(session['user_id']).profile_pic, 'message': new_msg.message})
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5000)
