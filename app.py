@@ -9,24 +9,48 @@ import cloudinary
 import cloudinary.uploader
 
 app = Flask(__name__)
+# Mas maayo kung naa ni sa Render Environment Variables
 app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey")
 
 # --- CLOUDINARY CONFIG ---
+# I-delete ni nga line kung na-add na nimo ang CLOUDINARY_URL sa Render Dashboard
 os.environ["CLOUDINARY_URL"] = "cloudinary://179391797818159:DfNDDAsqR2dAy4KH8sZa2_P7x2g@dzwn8b3ax"
 cloudinary.config(secure=True)
 
 # --- DATABASE CONFIG ---
 if os.environ.get('DATABASE_URL'):
+    # Fix para sa "postgres://" vs "postgresql://"
     database_url = os.environ.get('DATABASE_URL').replace("postgres://", "postgresql://", 1)
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {"connect_args": {"sslmode": "require"}}
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        "connect_args": {"sslmode": "require"},
+        "pool_pre_ping": True,
+    }
 else:
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///blog.db'
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
+
 # --- MODELS ---
+class Notification(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    recipient_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    sender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=True)
+    type = db.Column(db.String(20)) 
+    is_read = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    sender = db.relationship('User', foreign_keys=[sender_id])
+
+class ChatMessage(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    message = db.Column(db.String(500), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user = db.relationship('User', backref='messages')
+
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
@@ -96,6 +120,12 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated
 
+def create_notification(recipient_id, sender_id, post_id, type):
+    if recipient_id != sender_id:
+        notif = Notification(recipient_id=recipient_id, sender_id=sender_id, post_id=post_id, type=type)
+        db.session.add(notif)
+        db.session.commit()
+
 # --- ROUTES ---
 @app.route('/')
 def public_home():
@@ -115,9 +145,11 @@ def create_post():
 
         if 'media_file' in request.files:
             file = request.files['media_file']
-            if file.filename != '':
+            if file and file.filename != '':
+                # I-upload sa Cloudinary as "auto" para dawat image/video
                 upload_result = cloudinary.uploader.upload(file, resource_type="auto")
-                media_url = upload_result['secure_url']
+                media_url = upload_result.get('secure_url')
+                # I-check kung video ba
                 media_type = 'video' if 'video' in upload_result.get('resource_type', '') else 'image'
 
         new_post = Post(title=title, content=content, slug=slug, author=user.username,
@@ -143,9 +175,17 @@ def add_comment(post_id):
     data = request.get_json()
     if not data or not data.get('content'):
         return jsonify({"error": "Empty comment"}), 400
+    
+    post = Post.query.get_or_404(post_id)
     new_comment = Comment(post_id=post_id, user_id=session['user_id'], content=data.get('content'))
     db.session.add(new_comment)
     db.session.commit()
+    
+    # Notify ang tag-iya sa post
+    post_owner = User.query.filter_by(username=post.author).first()
+    if post_owner:
+        create_notification(post_owner.id, session['user_id'], post.id, 'comment')
+
     return jsonify({
         "username": new_comment.user.username,
         "profile_pic": new_comment.user.profile_pic,
@@ -182,7 +222,7 @@ def profile_settings():
             file = request.files['profile_pic']
             if file.filename != '':
                 res = cloudinary.uploader.upload(file)
-                user.profile_pic = res['secure_url']
+                user.profile_pic = res.get('secure_url')
         db.session.commit()
         return redirect(url_for('dashboard'))
     return render_template('profile_settings.html', user=user)
@@ -191,17 +231,23 @@ def profile_settings():
 @login_required
 def react(post_id, reac_type):
     user_id = session['user_id']
+    post = Post.query.get_or_404(post_id)
     existing = Reaction.query.filter_by(post_id=post_id, user_id=user_id).first()
+    
     if existing:
         existing.type = reac_type
     else:
         db.session.add(Reaction(post_id=post_id, user_id=user_id, type=reac_type))
+        # Notify ang tag-iya sa post
+        post_owner = User.query.filter_by(username=post.author).first()
+        if post_owner:
+            create_notification(post_owner.id, user_id, post_id, 'fire')
+            
     db.session.commit()
     return jsonify({"count": Reaction.query.filter_by(post_id=post_id).count()})
 
 @app.route('/profile/<username>')
 def view_profile(username):
-    # GI-FIX: Gigamit ang 'target_user' para mupares sa imong HTML
     user_profile = User.query.filter_by(username=username).first_or_404()
     posts = Post.query.filter_by(author=username, approved=True).order_by(Post.created_at.desc()).all()
     return render_template('profile.html', target_user=user_profile, posts=posts)
@@ -230,9 +276,9 @@ def edit_post(post_id):
         post.content = request.form.get('content')
         if 'media_file' in request.files:
             file = request.files['media_file']
-            if file.filename != '':
+            if file and file.filename != '':
                 res = cloudinary.uploader.upload(file, resource_type="auto")
-                post.media_file = res['secure_url']
+                post.media_file = res.get('secure_url')
                 post.media_type = 'video' if 'video' in res.get('resource_type', '') else 'image'
         db.session.commit()
         flash("Post updated successfully!")
@@ -277,6 +323,41 @@ def reject_post(post_id):
     db.session.commit()
     flash("Post rejected and deleted.")
     return redirect(url_for('dashboard'))
+
+@app.route('/search')
+def search():
+    query = request.args.get('q', '')
+    users = User.query.filter(User.username.ilike(f'%{query}%')).all() if query else []
+    return render_template('search_results.html', users=users, query=query)
+
+@app.route('/notifications')
+@login_required
+def notifications():
+    notifs = Notification.query.filter_by(recipient_id=session['user_id']).order_by(Notification.created_at.desc()).all()
+    for n in notifs:
+        n.is_read = True
+    db.session.commit()
+    return render_template('notifications.html', notifications=notifs)
+
+@app.route('/chat')
+@login_required
+def chat():
+    messages = ChatMessage.query.order_by(ChatMessage.created_at.asc()).all()
+    return render_template('chat.html', messages=messages)
+
+@app.route('/send_message', methods=['POST'])
+@login_required
+def send_message():
+    data = request.get_json()
+    new_msg = ChatMessage(user_id=session['user_id'], message=data['message'])
+    db.session.add(new_msg)
+    db.session.commit()
+
+    return jsonify({
+        'username': User.query.get(session['user_id']).username,
+        'profile_pic': User.query.get(session['user_id']).profile_pic,
+        'message': new_msg.message
+    })
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5000)

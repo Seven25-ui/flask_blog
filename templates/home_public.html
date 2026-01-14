@@ -18,22 +18,43 @@
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
 
-    <nav class="glass-nav sticky top-0 z-50 p-4 border-b dark:border-gray-700">
-        <div class="max-w-2xl mx-auto flex justify-between items-center">
-            <a href="/" class="text-2xl font-black tracking-tighter text-blue-600 dark:text-blue-400">SEVEN33</a>
-            <div class="flex items-center gap-4">
+    <nav class="glass-nav sticky top-0 z-50 p-3 border-b dark:border-gray-700">
+        <div class="max-w-2xl mx-auto flex items-center justify-between gap-3">
+            <a href="/" class="text-3xl font-black tracking-tighter text-blue-600 dark:text-blue-400 hover:scale-105 transition-transform">S33</a>
+
+            <form action="/search" method="GET" class="flex-1 max-w-md">
+                <div class="relative">
+                    <input type="text" name="q" placeholder="Search Seven33"
+                           class="w-full bg-gray-100 dark:bg-gray-800 text-sm py-2 px-10 rounded-full outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+                    <span class="absolute left-3 top-2.5 opacity-50">🔍</span>
+                </div>
+            </form>
+
+            <div class="flex items-center gap-1">
+                <a href="/chat" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition" title="Live Chat">
+                    <span class="text-xl">💬</span>
+                </a>
+
+                <a href="/notifications" class="relative p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+                    <span class="text-xl">🔔</span>
+                    <span id="notif-badge" class="absolute top-1 right-1 bg-red-600 text-[10px] text-white font-bold px-1.5 rounded-full border-2 border-white dark:border-gray-900 hidden">0</span>
+                </a>
+
                 <button id="darkToggle" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition">💡</button>
+
                 {% if user %}
-                    <a href="{{ url_for('dashboard') }}" class="text-sm font-bold bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition">Dashboard</a>
+                    <a href="{{ url_for('dashboard') }}">
+                        <img src="{{ user.profile_pic }}" class="w-8 h-8 rounded-full object-cover border dark:border-gray-700">
+                    </a>
                 {% else %}
-                    <a href="{{ url_for('login') }}" class="text-sm font-bold">Login</a>
+                    <a href="{{ url_for('login') }}" class="text-sm font-bold bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition">Login</a>
                 {% endif %}
             </div>
         </div>
     </nav>
 
     <main class="max-w-2xl mx-auto py-8 px-4">
-        
+
         <div class="mb-8">
             <h1 class="text-3xl font-black tracking-tight bg-gradient-to-r from-blue-600 to-purple-500 bg-clip-text text-transparent">
                 My Latest Feed ⚡
@@ -84,11 +105,11 @@
 
                     <div class="flex gap-6 border-t dark:border-gray-700 pt-4 mb-4">
                         <button onclick="sendReaction({{ post.id }}, 'fire')" class="flex items-center gap-2 group">
-                            <span class="p-2 rounded-full group-hover:bg-orange-100 dark:group-hover:bg-orange-900/30 transition">🔥</span> 
+                            <span class="p-2 rounded-full group-hover:bg-orange-100 dark:group-hover:bg-orange-900/30 transition">🔥</span>
                             <span id="react-count-{{ post.id }}" class="font-bold text-sm">{{ post.reactions.count() }}</span>
                         </button>
                         <button onclick="sharePost('{{ post.title }}', '{{ url_for('view_post', slug=post.slug, _external=True) }}')" class="flex items-center gap-2 group">
-                            <span class="p-2 rounded-full group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30 transition">📤</span> 
+                            <span class="p-2 rounded-full group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30 transition">📤</span>
                             <span class="text-xs font-bold uppercase tracking-widest group-hover:text-blue-500 transition">Share</span>
                         </button>
                     </div>
@@ -127,7 +148,9 @@
         function sendReaction(postId, type) {
             fetch(`/react/${postId}/${type}`, { method: 'POST' })
             .then(res => res.json())
-            .then(data => { document.getElementById(`react-count-${postId}`).innerText = data.count; });
+            .then(data => {
+                document.getElementById(`react-count-${postId}`).innerText = data.count;
+            });
         }
 
         function sharePost(title, url) {

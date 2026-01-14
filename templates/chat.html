@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S33 • Live Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>tailwind.config = { darkMode: 'class' };</script>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 h-screen flex flex-col">
+
+    <nav class="p-4 border-b dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center gap-4">
+        <a href="/" class="text-blue-500 font-bold">←</a>
+        <h1 class="font-black text-xl">S33 Community Chat</h1>
+    </nav>
+
+    <main id="chat-box" class="flex-1 overflow-y-auto p-4 space-y-4">
+        {% for m in messages %}
+        <div class="flex items-start gap-3 {{ 'flex-row-reverse' if m.user_id == session['user_id'] }}">
+            <img src="{{ m.user.profile_pic }}" class="w-8 h-8 rounded-full object-cover">
+            <div class="{{ 'bg-blue-600 text-white' if m.user_id == session['user_id'] else 'bg-gray-200 dark:bg-gray-700' }} px-4 py-2 rounded-2xl max-w-[70%] text-sm">
+                <p class="text-[10px] opacity-70 font-bold mb-1">{{ m.user.username }}</p>
+                <p>{{ m.message }}</p>
+            </div>
+        </div>
+        {% endfor %}
+    </main>
+
+    <div class="p-4 bg-white dark:bg-gray-800 border-t dark:border-gray-700">
+        <div class="max-w-2xl mx-auto flex gap-2">
+            <input type="text" id="chat-input" placeholder="Type a message..." 
+                   class="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full px-6 py-3 outline-none focus:ring-2 focus:ring-blue-500">
+            <button onclick="sendMessage()" class="bg-blue-600 text-white p-3 rounded-full hover:bg-blue-700 transition">
+                🚀
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const chatBox = document.getElementById('chat-box');
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            if (!message) return;
+
+            fetch('/send_message', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: message })
+            })
+            .then(res => res.json())
+            .then(data => {
+                input.value = '';
+                // I-add ang message sa screen dayon (Local Echo)
+                location.reload(); // Simple refresh lang sa para dali
+            });
+        }
+
+        if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
+    </script>
+</body>
+</html>
