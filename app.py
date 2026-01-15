@@ -12,6 +12,7 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey")
 
 # --- 1. CLOUDINARY CONFIG ---
+# Mogamit ni sa CLOUDINARY_URL variable sa Render, pero naay backup
 cloudinary.config(
     cloudinary_url=os.environ.get("CLOUDINARY_URL", "cloudinary://179391797818159:DfNDDAsqR2dAy4KH8sZa2_P7x2g@dzwn8b3ax"),
     secure=True
@@ -20,23 +21,28 @@ cloudinary.config(
 # --- 2. DATABASE CONFIG ---
 database_url = os.environ.get('DATABASE_URL')
 if database_url:
+    # Kani ang importante para sa Neon + Termux/Render compatibility
     if database_url.startswith("postgres://"):
         database_url = database_url.replace("postgres://", "postgresql+pg8000://", 1)
     elif database_url.startswith("postgresql://"):
         database_url = database_url.replace("postgresql://", "postgresql+pg8000://", 1)
+    
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {"pool_pre_ping": True}
-    print("✅ RENDER LOG: CONNECTED TO POSTGRESQL (via pg8000)!")
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        "pool_pre_ping": True,
+        "pool_recycle": 300,
+    }
+    print("✅ RENDER LOG: CONNECTED TO NEON POSTGRESQL!")
 else:
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///blog.db'
     print("⚠️ WARNING: DATABASE_URL NOT FOUND! USING SQLITE...")
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# --- 3. INITIALIZE DB (DAPAT NAA NI SA TAAS SA MODELS!) ---
+# --- 3. INITIALIZE DB ---
 db = SQLAlchemy(app)
 
-# --- 4. MODELS (CLASSES) ---
+# --- 4. MODELS ---
 class Notification(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     recipient_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -62,6 +68,7 @@ class User(db.Model):
     bio = db.Column(db.Text, nullable=True)
     profile_pic = db.Column(db.String(500), default='https://res.cloudinary.com/demo/image/upload/d_avatar.png/v1/avatar.png')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    notifications = db.relationship('Notification', foreign_keys=[Notification.recipient_id], backref='recipient', lazy='dynamic')
 
 class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -90,6 +97,7 @@ class Comment(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     user = db.relationship('User', backref='user_comments')
 
+# Kani mag-create sa tables sa Neon kon wala pa
 with app.app_context():
     db.create_all()
 
@@ -120,12 +128,6 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated
 
-def create_notification(recipient_id, sender_id, post_id, type):
-    if recipient_id != sender_id:
-        notif = Notification(recipient_id=recipient_id, sender_id=sender_id, post_id=post_id, type=type)
-        db.session.add(notif)
-        db.session.commit()
-
 # --- 6. ROUTES ---
 @app.route('/')
 def public_home():
@@ -143,12 +145,14 @@ def create_post():
             content = request.form.get('content')
             slug = re.sub(r'[^a-zA-Z0-9 ]', '', title).replace(" ", "-").lower() + "-" + str(int(datetime.utcnow().timestamp()))
             media_url, media_type = None, None
+            
             if 'media_file' in request.files:
                 file = request.files['media_file']
                 if file and file.filename != '':
                     upload_result = cloudinary.uploader.upload(file, resource_type="auto")
                     media_url = upload_result.get('secure_url')
                     media_type = 'video' if 'video' in str(upload_result.get('resource_type', '')) else 'image'
+            
             new_post = Post(title=title, content=content, slug=slug, author=user.username,
                             approved=user.is_admin, media_file=media_url, media_type=media_type)
             db.session.add(new_post)
@@ -174,10 +178,16 @@ def dashboard():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
+        username = request.form['username']
+        if User.query.filter_by(username=username).first():
+            flash("Username already exists!")
+            return redirect(url_for('register'))
         hashed_pw = generate_password_hash(request.form['password'])
         is_first = User.query.count() == 0
-        db.session.add(User(username=request.form['username'], password=hashed_pw, is_admin=is_first))
+        new_user = User(username=username, password=hashed_pw, is_admin=is_first)
+        db.session.add(new_user)
         db.session.commit()
+        flash("Registered successfully! Please login.")
         return redirect(url_for('login'))
     return render_template('register.html')
 
@@ -203,6 +213,7 @@ def profile_settings():
                 res = cloudinary.uploader.upload(file)
                 user.profile_pic = res.get('secure_url')
         db.session.commit()
+        flash("Profile updated!")
         return redirect(url_for('dashboard'))
     return render_template('profile_settings.html', user=user)
 
@@ -216,21 +227,6 @@ def logout():
     session.clear()
     return redirect(url_for('public_home'))
 
-@app.route('/edit/<int:post_id>', methods=['GET', 'POST'])
-@login_required
-def edit_post(post_id):
-    post = Post.query.get_or_404(post_id)
-    user = db.session.get(User, session['user_id'])
-    if post.author != user.username and not user.is_admin:
-        flash("Dili nimo pwede usbon!")
-        return redirect(url_for('dashboard'))
-    if request.method == 'POST':
-        post.title = request.form.get('title')
-        post.content = request.form.get('content')
-        db.session.commit()
-        return redirect(url_for('dashboard'))
-    return render_template('create_post.html', post=post)
-
 @app.route('/delete/<int:post_id>', methods=['POST'])
 @login_required
 def delete_post(post_id):
@@ -239,6 +235,7 @@ def delete_post(post_id):
     if post.author == user.username or user.is_admin:
         db.session.delete(post)
         db.session.commit()
+        flash("Post deleted!")
     return redirect(url_for('dashboard'))
 
 if __name__ == "__main__":
