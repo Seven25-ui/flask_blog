@@ -26,17 +26,26 @@
         <form method="POST" class="space-y-5">
             <div>
                 <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Choose Username</label>
-                <input type="text" name="username" required 
+                <input type="text" name="username" required
                        class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition"
                        placeholder="Username (e.g. dev_master)">
             </div>
             <div>
                 <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Create Password</label>
-                <input type="password" name="password" required 
+                <input type="password" name="password" id="passwordInput" required
                        class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition"
                        placeholder="Min. 8 characters">
+                
+                <div class="mt-2 flex items-center">
+                    <input type="checkbox" id="showPw" onclick="togglePassword()" 
+                           class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer">
+                    <label for="showPw" class="ml-2 text-xs font-semibold text-gray-500 cursor-pointer select-none">
+                        Show Password
+                    </label>
+                </div>
             </div>
-            <button type="submit" 
+
+            <button type="submit"
                     class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-green-200 transition transform active:scale-95">
                 Create Account
             </button>
@@ -44,10 +53,21 @@
 
         <div class="mt-8 text-center border-t pt-6">
             <p class="text-sm text-gray-500">
-                Already have an account? 
+                Already have an account?
                 <a href="{{ url_for('login') }}" class="text-blue-600 font-bold hover:underline">Sign In</a>
             </p>
         </div>
     </div>
+
+    <script>
+        function togglePassword() {
+            const pwInput = document.getElementById('passwordInput');
+            if (pwInput.type === "password") {
+                pwInput.type = "text";
+            } else {
+                pwInput.type = "password";
+            }
+        }
+    </script>
 </body>
 </html>

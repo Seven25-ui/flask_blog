@@ -3,21 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login • Seven33</title>
+    <title>Seven33 • Login</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-50 flex items-center justify-center min-h-screen p-4">
     <div class="max-w-md w-full bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
         <div class="text-center mb-8">
-            <h1 class="text-3xl font-black text-blue-600 tracking-tighter">SEVEN33</h1>
-            <p class="text-gray-500 mt-2 font-medium">Welcome back! Please sign in.</p>
+            <h1 class="text-3xl font-black text-blue-600 tracking-tighter">SEVEN33 LOGIN</h1>
+            <p class="text-gray-500 mt-2 font-medium">Welcome back! Please enter your details.</p>
         </div>
 
         {% with messages = get_flashed_messages() %}
             {% if messages %}
                 {% for message in messages %}
                     <div class="bg-red-50 text-red-600 p-3 rounded-lg text-sm mb-4 border border-red-100 font-bold">
-                        ⚠️ {{ message }}
+                        {{ message }}
                     </div>
                 {% endfor %}
             {% endif %}
@@ -26,17 +26,26 @@
         <form method="POST" class="space-y-5">
             <div>
                 <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Username</label>
-                <input type="text" name="username" required 
+                <input type="text" name="username" required
                        class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition"
                        placeholder="Enter your username">
             </div>
             <div>
                 <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Password</label>
-                <input type="password" name="password" required 
+                <input type="password" name="password" id="loginPassword" required
                        class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition"
-                       placeholder="••••••••">
+                       placeholder="Enter your password">
+                
+                <div class="mt-2 flex items-center">
+                    <input type="checkbox" id="showLoginPw" onclick="toggleLoginPassword()" 
+                           class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer">
+                    <label for="showLoginPw" class="ml-2 text-xs font-semibold text-gray-500 cursor-pointer select-none">
+                        Show Password
+                    </label>
+                </div>
             </div>
-            <button type="submit" 
+
+            <button type="submit"
                     class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-200 transition transform active:scale-95">
                 Sign In
             </button>
@@ -44,10 +53,21 @@
 
         <div class="mt-8 text-center border-t pt-6">
             <p class="text-sm text-gray-500">
-                Don't have an account? 
-                <a href="{{ url_for('register') }}" class="text-blue-600 font-bold hover:underline">Join Seven33</a>
+                Don't have an account yet?
+                <a href="{{ url_for('register') }}" class="text-green-600 font-bold hover:underline">Register Now</a>
             </p>
         </div>
     </div>
+
+    <script>
+        function toggleLoginPassword() {
+            const pwInput = document.getElementById('loginPassword');
+            if (pwInput.type === "password") {
+                pwInput.type = "text";
+            } else {
+                pwInput.type = "password";
+            }
+        }
+    </script>
 </body>
 </html>
