@@ -23,7 +23,7 @@
         }
     </style>
 </head>
-<body class="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">    
+<body class="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
     <nav class="sticky top-0 z-40 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border-b dark:border-gray-800">
         <div class="max-w-2xl mx-auto px-4 py-3 flex justify-between items-center relative">
             <div class="flex items-center gap-1">
@@ -109,7 +109,7 @@
                             </a>
                             <span class="text-gray-500 text-sm">· {{ time_ago(post.created_at) }}</span>
                         </div>
-                        
+
                         <a href="/post/{{ post.slug }}" class="block">
                             <h2 class="text-[1.1rem] font-bold leading-tight mb-1">{{ post.title }}</h2>
                             <p class="text-gray-600 dark:text-gray-300 text-[0.95rem] line-clamp-3 mb-3">{{ post.content | striptags }}</p>
@@ -140,18 +140,41 @@
                         </div>
 
                         <div id="comment-box-{{ post.id }}" class="hidden mt-4 pt-4 border-t dark:border-gray-800">
-                            {% if user %}
+                            {% if session.get('user_id') %}
                             <div class="flex gap-3 mb-4">
-                                <img src="{{ user.profile_pic if user.profile_pic else 'https://ui-avatars.com/api/?name=' + user.username }}" class="w-8 h-8 rounded-full object-cover">
+                                <img src="{{ user.profile_pic if user and user.profile_pic else 'https://ui-avatars.com/api/?name=' + (user.username if user else 'User') }}" class="w-8 h-8 rounded-full object-cover">
                                 <div class="flex-1 relative">
-                                    <input type="text" id="comment-input-{{ post.id }}" 
+                                    <input type="text" id="comment-input-{{ post.id }}"
                                            class="w-full bg-gray-100 dark:bg-gray-800 border-none rounded-2xl px-4 py-2 text-sm focus:ring-2 focus:ring-skyBlue outline-none"
                                            placeholder="Reply...">
                                     <button onclick="submitComment('{{ post.id }}')" class="absolute right-2 top-1/2 -translate-y-1/2 text-skyBlue font-bold text-sm px-2">Post</button>
                                 </div>
                             </div>
                             {% endif %}
-                            <div id="comments-list-{{ post.id }}" class="space-y-0"></div>
+                            
+                            <div id="comments-list-{{ post.id }}" class="space-y-4">
+                                {% for comment in get_comments_for_post(post.id) %}
+                                <div id="comment-{{ comment.id }}" class="flex gap-3 py-1 ml-1 border-l-2 border-gray-100 dark:border-gray-800 pl-4 group">
+                                    <img src="{{ comment.user.profile_pic if comment.user.profile_pic else 'https://ui-avatars.com/api/?name=' + comment.user.username }}" class="w-7 h-7 rounded-full object-cover">
+                                    <div class="flex-1">
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex items-center gap-2">
+                                                <span class="font-bold text-xs text-gray-900 dark:text-gray-100">{{ comment.user.username }}</span>
+                                                <span class="text-gray-500 text-[10px]">{{ time_ago(comment.created_at) }}</span>
+                                            </div>
+                                            {% if session.get('user_id') == comment.user_id %}
+                                            <button onclick="deleteComment({{ comment.id }}, '{{ post.id }}')" class="text-gray-400 hover:text-red-500 transition-colors">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                        <p class="text-sm text-gray-700 dark:text-gray-300">{{ comment.content }}</p>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -196,18 +219,24 @@
             })
             .then(res => res.json())
             .then(data => {
-                if (data.error) { window.location.href = "{{ url_for('login') }}"; } 
+                if (data.error) { window.location.href = "{{ url_for('login') }}"; }
                 else {
                     const list = document.getElementById(`comments-list-${postId}`);
                     const count = document.getElementById(`comment-count-${postId}`);
-                    const newComment = `<div class="flex gap-3 py-3 ml-1 border-l-2 border-gray-100 dark:border-gray-800 pl-4 comment-enter">
-                        <img src="${data.profile_pic}" class="w-8 h-8 rounded-full object-cover">
+                    const newComment = `
+                    <div id="comment-${data.id}" class="flex gap-3 py-1 ml-1 border-l-2 border-gray-100 dark:border-gray-800 pl-4 comment-enter group">
+                        <img src="${data.profile_pic}" class="w-7 h-7 rounded-full object-cover">
                         <div class="flex-1">
-                            <div class="flex items-center gap-1">
-                                <span class="font-bold text-sm">${data.username}</span>
-                                <span class="text-gray-500 text-xs">· just now</span>
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-xs">${data.username}</span>
+                                    <span class="text-gray-500 text-[10px]">· just now</span>
+                                </div>
+                                <button onclick="deleteComment(${data.id}, '${postId}')" class="text-gray-400 hover:text-red-500 transition-colors">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                </button>
                             </div>
-                            <p class="text-sm mt-0.5">${data.content}</p>
+                            <p class="text-sm text-gray-700 dark:text-gray-300">${data.content}</p>
                         </div>
                     </div>`;
                     list.insertAdjacentHTML('afterbegin', newComment);
@@ -216,6 +245,21 @@
                 }
             });
         }
+
+        function deleteComment(commentId, postId) {
+            if (!confirm('Delete this comment?')) return;
+            fetch(`/delete_comment/${commentId}`, { method: 'POST' })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    const el = document.getElementById(`comment-${commentId}`);
+                    if(el) el.remove();
+                    const count = document.getElementById(`comment-count-${postId}`);
+                    if(count) count.innerText = Math.max(0, parseInt(count.innerText) - 1);
+                }
+            });
+        }
+
         function handleLike(postId) {
             fetch(`/like/${postId}`, { method: 'POST' })
             .then(res => res.json())

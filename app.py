@@ -113,12 +113,12 @@ def login_required(f):
 def utility_processor():
     def get_user_by_username(username):
         return User.query.filter_by(username=username).first()
-    
+
     def get_read_time(content):
         words_per_minute = 200
         words = len(content.split())
         return max(1, round(words / words_per_minute))
-    
+
     def time_ago(date):
         if not date: return ""
         now = datetime.utcnow()
@@ -147,13 +147,26 @@ def utility_processor():
     def get_comment_count(post_id):
         return Comment.query.filter_by(post_id=post_id).count()
 
+    def get_comments_for_post(post_id):
+        return Comment.query.filter_by(post_id=post_id).order_by(Comment.created_at.desc()).all()
+
+    def get_follower_count(user_id):
+        return Follow.query.filter_by(followed_id=user_id).count()
+
+    def is_following(follower_id, followed_id):
+        if not follower_id: return False
+        return Follow.query.filter_by(follower_id=follower_id, followed_id=followed_id).first() is not None
+
     return dict(
         get_user_by_username=get_user_by_username,
         get_read_time=get_read_time,
         time_ago=time_ago,
         user_has_liked=user_has_liked,
         get_like_count=get_like_count,
-        get_comment_count=get_comment_count
+        get_comment_count=get_comment_count,
+        get_comments_for_post=get_comments_for_post,
+        get_follower_count=get_follower_count,
+        is_following=is_following
     )
 
 # --- 4. ROUTES ---
