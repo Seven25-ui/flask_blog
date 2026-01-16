@@ -51,6 +51,10 @@ class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     content = db.Column(db.Text, nullable=False)
+    
+    # KANI NGA LINE ANG IDUGANG
+    hashtags = db.Column(db.String(200), nullable=True) 
+    
     slug = db.Column(db.String(200), unique=True, nullable=False)
     author = db.Column(db.String(80), nullable=False)
     author_id = db.Column(db.Integer, db.ForeignKey('user.id'))
@@ -58,11 +62,7 @@ class Post(db.Model):
     approved = db.Column(db.Boolean, default=False)
     media_file = db.Column(db.String(500), nullable=True)
     media_type = db.Column(db.String(10), nullable=True)
-
-    # Relationships with CASCADE
-    reactions = db.relationship('Reaction', backref='post', lazy='dynamic', cascade="all, delete-orphan")
-    likes = db.relationship('Like', backref='post', lazy='dynamic', cascade="all, delete-orphan")
-    comments = db.relationship('Comment', backref='post_parent', lazy='dynamic', cascade="all, delete-orphan")
+    # ... (relationships pabilin ra)
 
 class Reaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -99,6 +99,8 @@ class Message(db.Model):
 
     sender = db.relationship('User', foreign_keys=[sender_id], backref='sent_messages')
     receiver = db.relationship('User', foreign_keys=[receiver_id], backref='received_messages')
+
+
 
 # --- 3. HELPERS & UTILITIES ---
 
@@ -254,24 +256,40 @@ def dashboard():
 def create_post():
     user = db.session.get(User, session['user_id'])
     if request.method == 'POST':
-        title = request.form.get('title')                     
-        content = request.form.get('content')                 
+        title = request.form.get('title')             
+        content = request.form.get('content')         
+        
+        # 1. KUHAON ANG HASHTAGS GIKAN SA HTML FORM
+        hashtags = request.form.get('hashtags') 
+        
         slug = re.sub(r'[^a-zA-Z0-9 ]', '', title).replace(" ", "-").lower() + "-" + str(int(datetime.utcnow().timestamp()))
-        media_url, media_type = None, None                                                                          
+        media_url, media_type = None, None                                                                   
+        
         if 'media_file' in request.files:
             file = request.files['media_file']
-            if file and file.filename != '':                          
+            if file and file.filename != '':          
                 res = cloudinary.uploader.upload(file, resource_type="auto")
                 media_url = res.get('secure_url')
                 media_type = 'video' if 'video' in str(res.get('resource_type')) else 'image'
 
-        new_post = Post(title=title, content=content, slug=slug, author=user.username, author_id=user.id,
-                        approved=user.is_admin, media_file=media_url, media_type=media_type)                         
+        # 2. I-SAVE ANG HASHTAGS SA DATABASE (I-apil sa Post object)
+        new_post = Post(
+            title=title, 
+            content=content, 
+            hashtags=hashtags, # <--- Gidugang ni
+            slug=slug, 
+            author=user.username, 
+            author_id=user.id,
+            approved=user.is_admin, 
+            media_file=media_url, 
+            media_type=media_type
+        )                
+        
         db.session.add(new_post)
         db.session.commit()
         return redirect(url_for('dashboard'))
+        
     return render_template('create_post.html')
-
 
 @app.route('/edit/<int:post_id>', methods=['GET', 'POST'])
 @login_required
@@ -326,15 +344,15 @@ def delete_post(post_id):
         db.session.commit()
     return redirect(url_for('dashboard'))             
 
-@app.route('/approve/<int:post_id>')                  
+@app.route('/approve/<int:post_id>', methods=['POST']) # <--- Kani ang importante nga naay POST
 @login_required
 def approve_post(post_id):
     user = db.session.get(User, session['user_id'])
     if user.is_admin:
         post = Post.query.get_or_404(post_id)
-        post.approved = True                                  
+        post.approved = True
         db.session.commit()
-    return redirect(url_for('dashboard'))             
+    return redirect(url_for('dashboard'))
 
 @app.route('/reject/<int:post_id>')
 @login_required
