@@ -497,5 +497,14 @@ def delete_comment(comment_id):
     db.session.commit()
     return {"success": True}
 
+@app.route('/sw.js')
+def serve_sw():
+    # Kini mag-serve sa imong service worker file gikan sa static folder
+    return send_from_directory('static', 'sw.js', mimetype='application/javascript')
+
+@app.route('/manifest.json')
+def serve_manifest():
+    return send_from_directory('static', 'manifest.json')
+
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5000)

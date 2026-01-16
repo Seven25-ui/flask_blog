@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SE7EN - {{ active_tab | capitalize if active_tab else 'Discover' }}</title>
+    
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="theme-color" content="#000000">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='se7en-logo.png') }}">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -25,7 +31,7 @@
     </style>
 </head>
 <body class="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
-    
+
     <nav class="sticky top-0 z-40 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border-b dark:border-gray-800">
         <div class="max-w-2xl mx-auto px-4 py-3 flex justify-between items-center relative">
             <div class="flex items-center gap-1">
@@ -108,7 +114,7 @@
                             </a>
                             <span class="text-gray-500 text-sm">· {{ time_ago(post.created_at) }}</span>
                         </div>
-                        
+
                         <a href="/post/{{ post.slug }}" class="block">
                             <h2 class="text-[1.1rem] font-bold leading-tight mb-1">{{ post.title }}</h2>
                             <p class="text-gray-600 dark:text-gray-300 text-[0.95rem] line-clamp-3 mb-2">{{ post.content | striptags }}</p>
@@ -198,7 +204,7 @@
                 <svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.1L2 11h3v9h6v-5h2v5h6v-9h3L12 2.1z"/></svg>
             </a>
             <a href="#" class="text-gray-400"><svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg></a>
-            <a href="{{ url_for('create_post') }}" class="text-gray-400"><svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg></a>
+            <a href="{{ url_for('create_post') }}" class="text-gray-400"><svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6-h2v-6H5v-2h6V5h2v6h6v2z"/></svg></a>
             <a href="{{ url_for('profile_settings') }}" class="w-7 h-7 rounded-full overflow-hidden border-2 border-gray-300">
                 <img src="{{ user.profile_pic if user and user.profile_pic else 'https://ui-avatars.com/api/?name=' + (user.username if user else 'Guest') }}" class="w-full h-full object-cover">
             </a>
@@ -206,6 +212,15 @@
     </div>
 
     <script>
+        // PWA SERVICE WORKER REGISTRATION
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                .then(reg => console.log('SE7EN PWA Ready'))
+                .catch(err => console.log('PWA Error', err));
+            });
+        }
+
         function toggleMenu() {
             document.getElementById('sideMenu').classList.toggle('-translate-x-full');
             document.getElementById('overlay').classList.toggle('hidden');
