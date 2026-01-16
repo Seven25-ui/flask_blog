@@ -5,8 +5,11 @@ import os
 import re
 from datetime import datetime
 from functools import wraps
+
+# Cloudinary Imports
 import cloudinary
 import cloudinary.uploader
+from cloudinary.uploader import upload  # Gidugang para diretso na upload() sa routes
 
 app = Flask(__name__)
 app.secret_key = "aloy_super_secret_key_733"
@@ -32,12 +35,15 @@ db = SQLAlchemy(app)
 # --- 2. MODELS ---
 
 class User(db.Model):
+    __table_args__ = {'extend_existing': True}
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
     bio = db.Column(db.Text, nullable=True)
     profile_pic = db.Column(db.String(500), default='https://res.cloudinary.com/demo/image/upload/v1/avatar.png')
+    # Mao ni ang atong gidugang para sa background banner
+    background_pic = db.Column(db.String(500), default='https://res.cloudinary.com/demo/image/upload/v1/sample.jpg')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Post(db.Model):
@@ -47,12 +53,16 @@ class Post(db.Model):
     content = db.Column(db.Text, nullable=False)
     slug = db.Column(db.String(200), unique=True, nullable=False)
     author = db.Column(db.String(80), nullable=False)
-    author_id = db.Column(db.Integer, db.ForeignKey('user.id')) # Gi-add para sa filtering
+    author_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     approved = db.Column(db.Boolean, default=False)
     media_file = db.Column(db.String(500), nullable=True)
     media_type = db.Column(db.String(10), nullable=True)
+
+    # Relationships with CASCADE
     reactions = db.relationship('Reaction', backref='post', lazy='dynamic', cascade="all, delete-orphan")
+    likes = db.relationship('Like', backref='post', lazy='dynamic', cascade="all, delete-orphan")
+    comments = db.relationship('Comment', backref='post_parent', lazy='dynamic', cascade="all, delete-orphan")
 
 class Reaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -71,7 +81,7 @@ class Comment(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     content = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    user = db.relationship('User', backref='comments')
+    user = db.relationship('User', backref='user_comments')
 
 class Follow(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -79,7 +89,6 @@ class Follow(db.Model):
     followed_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=db.func.now())
 
-# BAG-O: Message Model para sa DMs
 class Message(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     sender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -87,7 +96,7 @@ class Message(db.Model):
     content = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_read = db.Column(db.Boolean, default=False)
-    
+
     sender = db.relationship('User', foreign_keys=[sender_id], backref='sent_messages')
     receiver = db.relationship('User', foreign_keys=[receiver_id], backref='received_messages')
 
@@ -250,17 +259,48 @@ def create_post():
         return redirect(url_for('dashboard'))
     return render_template('create_post.html')
 
-@app.route('/edit/<int:post_id>', methods=['GET', 'POST'])                                                  
+
+@app.route('/edit/<int:post_id>', methods=['GET', 'POST'])
 @login_required
 def edit_post(post_id):
+    # 1. Kuhaon ang post ug ang current user
     post = Post.query.get_or_404(post_id)
     user = db.session.get(User, session['user_id'])
-    if post.author != user.username and not user.is_admin: return "Unauthorized", 403
+    
+    # 2. Security Check: Siguroa nga tag-iya o admin ang nag-edit
+    if post.author != user.username and not user.is_admin: 
+        return "Unauthorized", 403
+        
     if request.method == 'POST':
-        post.title = request.form.get('title')                
+        # 3. Update ang text content
+        post.title = request.form.get('title')        
         post.content = request.form.get('content')
+        
+        # 4. Handle Media Update (Image o Video)
+        file = request.files.get('media_file') 
+        if file and file.filename != '':
+            try:
+                # I-upload ang bag-ong file sa Cloudinary
+                upload_result = upload(file) 
+                
+                # I-save ang bag-ong URL
+                post.media_file = upload_result['secure_url']
+                
+                # I-check kon image ba o video ang gi-upload
+                if 'video' in file.mimetype:
+                    post.media_type = 'video'
+                else:
+                    post.media_type = 'image'
+            except Exception as e:
+                flash(f"Error uploading media: {str(e)}", "danger")
+                return render_template('edit_post.html', post=post)
+
+        # 5. I-save ang tanang kausaban sa database
         db.session.commit()
-        return redirect(url_for('dashboard'))             
+        flash("Post updated successfully!", "success")
+        return redirect(url_for('dashboard'))         
+        
+    # I-load ang edit page kon GET request
     return render_template('edit_post.html', post=post)
 
 @app.route('/delete/<int:post_id>', methods=['POST'])
@@ -296,16 +336,31 @@ def reject_post(post_id):
 @app.route('/settings', methods=['GET', 'POST'])
 @login_required
 def profile_settings():
-    user = db.session.get(User, session['user_id'])       
+    user = db.session.get(User, session['user_id'])
+
     if request.method == 'POST':
         user.bio = request.form.get('bio')
+
         if 'profile_pic' in request.files:
-            file = request.files['profile_pic']
-            if file and file.filename != '':
-                res = cloudinary.uploader.upload(file)
-                user.profile_pic = res.get('secure_url')
-        db.session.commit()
-        return redirect(url_for('dashboard'))
+            p_file = request.files['profile_pic']
+            if p_file and p_file.filename != '':
+                p_res = cloudinary.uploader.upload(p_file)
+                user.profile_pic = p_res.get('secure_url')
+
+        if 'background_pic' in request.files:
+            bg_file = request.files['background_pic']
+            if bg_file and bg_file.filename != '':
+                bg_res = cloudinary.uploader.upload(bg_file)
+                user.background_pic = bg_res.get('secure_url')
+
+        try:
+            db.session.commit()
+            # Kani nga line ang gi-update:
+            return redirect(url_for('user_profile', username=user.username))
+        except Exception as e:
+            db.session.rollback()
+            return f"Naay error sa pag-save: {str(e)}"
+
     return render_template('profile_settings.html', user=user)
 
 @app.route('/logout')
@@ -340,20 +395,28 @@ def like_post(post_id):
 def add_comment(post_id):
     if 'user_id' not in session:
         return {"error": "Unauthorized"}, 401
-    user = db.session.get(User, session['user_id'])   
+    
+    user = db.session.get(User, session['user_id'])
     data = request.get_json()
     content = data.get('content', '').strip()
+    
     if not content:
-        return {"error": "Empty comment"}, 400        
+        return {"error": "Empty comment"}, 400
+    
     new_comment = Comment(post_id=post_id, user_id=user.id, content=content)
     db.session.add(new_comment)
     db.session.commit()
+    
+    # Atong i-return ang formatted time (e.g., "Jan 16, 10:05 AM")
+    formatted_time = new_comment.created_at.strftime('%b %d, %I:%M %p')
+    
     return {
-        "success": True,                                      
+        "success": True,
         "username": user.username,
         "profile_pic": user.profile_pic if user.profile_pic else f"https://ui-avatars.com/api/?name={user.username}",
-        "content": content
-    }                                                 
+        "content": content,
+        "created_at": formatted_time  # Gi-dugang ni nga field
+    }
 
 @app.route('/follow/<int:user_id>', methods=['POST'])
 def follow_user(user_id):
@@ -385,6 +448,23 @@ app.jinja_env.globals.update(is_following=is_following, get_follower_count=get_f
 def view_post(slug):  # <--- Kinahanglan "view_post" ni nga name
     post = Post.query.filter_by(slug=slug).first_or_404()
     return render_template('view_post.html', post=post)
+
+@app.route('/delete_comment/<int:comment_id>', methods=['POST'])
+def delete_comment(comment_id):
+    if 'user_id' not in session:
+        return {"error": "Unauthorized"}, 401
+    
+    comment = db.session.get(Comment, comment_id)
+    if not comment:
+        return {"error": "Comment not found"}, 404
+        
+    # Siguroon nga ang tag-iya sa comment ang nag-delete
+    if comment.user_id != session['user_id']:
+        return {"error": "Permission denied"}, 403
+        
+    db.session.delete(comment)
+    db.session.commit()
+    return {"success": True}
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5000)

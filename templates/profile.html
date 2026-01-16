@@ -10,7 +10,6 @@
             darkMode: 'class',
             theme: { extend: { colors: { skyBlue: '#0085ff' } } }
         };
-        // DEFAULT DARK MODE CHECKER (Para dili mag-flash ang puti inig reload)
         if (localStorage.getItem('darkMode') === 'true') {
             document.documentElement.classList.add('dark');
         }
@@ -20,6 +19,9 @@
         @keyframes slideIn {
             from { opacity: 0; transform: translateX(-10px); }
             to { opacity: 1; transform: translateX(0); }
+        }
+        .banner-gradient {
+            background: linear-gradient(to bottom, transparent 60%, rgba(0,0,0,0.3));
         }
     </style>
 </head>
@@ -37,31 +39,38 @@
         </div>
 
         <div class="relative">
-            <div class="h-32 bg-skyBlue/20"></div>
-            
+            <div class="h-40 w-full bg-gray-200 dark:bg-gray-800 relative overflow-hidden">
+                {% if target_user.background_pic %}
+                    <img src="{{ target_user.background_pic }}" class="w-full h-full object-cover">
+                    <div class="absolute inset-0 banner-gradient"></div>
+                {% else %}
+                    <div class="w-full h-full bg-skyBlue/20"></div>
+                {% endif %}
+            </div>
+
             <div class="px-4">
-                <div class="flex justify-between items-end -mt-12 mb-4">
-                    <img src="{{ target_user.profile_pic if target_user.profile_pic else 'https://ui-avatars.com/api/?name=' + target_user.username }}" 
-                         class="w-24 h-24 rounded-full border-4 border-white dark:border-gray-900 object-cover shadow-sm">
-                    
+                <div class="flex justify-between items-end -mt-12 mb-4 relative z-10">
+                    <img src="{{ target_user.profile_pic if target_user.profile_pic else 'https://ui-avatars.com/api/?name=' + target_user.username }}"
+                         class="w-28 h-28 rounded-full border-4 border-white dark:border-gray-900 object-cover shadow-md">
+
                     <div id="follow-section">
                         {% if user and user.id == target_user.id %}
-                            <a href="{{ url_for('profile_settings') }}" class="px-4 py-2 border dark:border-gray-700 rounded-full font-bold text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition">Edit Profile</a>
+                            <a href="{{ url_for('profile_settings') }}" class="px-4 py-2 bg-white dark:bg-gray-900 border dark:border-gray-700 rounded-full font-bold text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition shadow-sm">Edit Profile</a>
                         {% elif user %}
                             {% if is_following(user.id, target_user.id) %}
-                                <button onclick="handleFollow({{ target_user.id }})" id="follow-btn" 
-                                    class="px-6 py-2 border border-gray-300 dark:border-gray-700 rounded-full font-bold text-sm hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition group">
+                                <button onclick="handleFollow({{ target_user.id }})" id="follow-btn"
+                                    class="px-6 py-2 border border-gray-300 dark:border-gray-700 rounded-full font-bold text-sm hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition group bg-white dark:bg-gray-900">
                                     <span class="group-hover:hidden">Following</span>
                                     <span class="hidden group-hover:inline">Unfollow</span>
                                 </button>
                             {% else %}
-                                <button onclick="handleFollow({{ target_user.id }})" id="follow-btn" 
-                                    class="px-6 py-2 bg-skyBlue text-white rounded-full font-bold text-sm hover:opacity-90 transition">
+                                <button onclick="handleFollow({{ target_user.id }})" id="follow-btn"
+                                    class="px-6 py-2 bg-skyBlue text-white rounded-full font-bold text-sm hover:opacity-90 transition shadow-sm">
                                     Follow
                                 </button>
                             {% endif %}
                         {% else %}
-                            <a href="{{ url_for('login') }}" class="px-6 py-2 bg-skyBlue text-white rounded-full font-bold text-sm">Follow</a>
+                            <a href="{{ url_for('login') }}" class="px-6 py-2 bg-skyBlue text-white rounded-full font-bold text-sm shadow-sm">Follow</a>
                         {% endif %}
                     </div>
                 </div>
@@ -89,10 +98,14 @@
                     <h3 class="font-bold text-lg mb-1 leading-tight">{{ post.title }}</h3>
                     <p class="text-gray-600 dark:text-gray-300 line-clamp-3 mb-3 text-[0.95rem]">{{ post.content | striptags }}</p>
                 </a>
-                
+
                 {% if post.media_file %}
                 <div class="rounded-xl overflow-hidden border dark:border-gray-700 mb-3 bg-black">
-                    <img src="{{ post.media_file }}" class="w-full max-h-80 object-cover opacity-90">
+                    {% if post.media_type == 'video' %}
+                        <video src="{{ post.media_file }}" controls class="w-full max-h-80 object-contain opacity-90"></video>
+                    {% else %}
+                        <img src="{{ post.media_file }}" class="w-full max-h-80 object-cover opacity-90">
+                    {% endif %}
                 </div>
                 {% endif %}
 
@@ -122,7 +135,28 @@
                         </div>
                     </div>
                     {% endif %}
-                    <div id="comments-list-{{ post.id }}" class="space-y-0"></div>
+                    
+                    <div id="comments-list-{{ post.id }}" class="space-y-4">
+                        {% for comment in get_comments_for_post(post.id) %}
+                        <div id="comment-{{ comment.id }}" class="flex gap-3 border-l-2 border-gray-100 dark:border-gray-800 pl-4 group">
+                            <img src="{{ comment.user.profile_pic if comment.user.profile_pic else 'https://ui-avatars.com/api/?name=' + comment.user.username }}" class="w-8 h-8 rounded-full object-cover">
+                            <div class="flex-1">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-bold text-sm">{{ comment.user.username }}</span>
+                                        <span class="text-gray-500 text-[10px] uppercase tracking-wider">{{ comment.created_at.strftime('%b %d, %I:%M %p') }}</span>
+                                    </div>
+                                    {% if user and user.id == comment.user_id %}
+                                    <button onclick="deleteComment({{ comment.id }}, '{{ post.id }}')" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                                <p class="text-sm mt-0.5 text-gray-700 dark:text-gray-300">{{ comment.content }}</p>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
                 </div>
             </article>
             {% else %}
@@ -134,7 +168,6 @@
     </main>
 
     <script>
-        // FOLLOW SYSTEM
         function handleFollow(userId) {
             fetch(`/follow/${userId}`, { method: 'POST' })
             .then(res => res.json())
@@ -148,16 +181,15 @@
                 count.innerText = data.count;
 
                 if (data.status === 'followed') {
-                    btn.className = "px-6 py-2 border border-gray-300 dark:border-gray-700 rounded-full font-bold text-sm hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition group";
+                    btn.className = "px-6 py-2 border border-gray-300 dark:border-gray-700 rounded-full font-bold text-sm hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition group bg-white dark:bg-gray-900";
                     btn.innerHTML = '<span class="group-hover:hidden">Following</span><span class="hidden group-hover:inline">Unfollow</span>';
                 } else {
-                    btn.className = "px-6 py-2 bg-skyBlue text-white rounded-full font-bold text-sm hover:opacity-90 transition";
+                    btn.className = "px-6 py-2 bg-skyBlue text-white rounded-full font-bold text-sm hover:opacity-90 transition shadow-sm";
                     btn.innerHTML = "Follow";
                 }
             });
         }
 
-        // COMMENTS SYSTEM
         function toggleComments(postId) {
             document.getElementById(`comment-box-${postId}`).classList.toggle('hidden');
         }
@@ -178,15 +210,19 @@
                 else {
                     const list = document.getElementById(`comments-list-${postId}`);
                     const count = document.getElementById(`comment-count-${postId}`);
+                    
+                    // Gi-update para naay Oras ug Username
                     const newComment = `
-                        <div class="flex gap-3 py-3 border-l-2 border-gray-100 dark:border-gray-800 pl-4 comment-enter">
+                        <div class="flex gap-3 py-3 border-l-2 border-gray-100 dark:border-gray-800 pl-4 comment-enter group">
                             <img src="${data.profile_pic}" class="w-8 h-8 rounded-full object-cover">
                             <div class="flex-1">
-                                <div class="flex items-center gap-1">
-                                    <span class="font-bold text-sm">${data.username}</span>
-                                    <span class="text-gray-500 text-xs">· just now</span>
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-bold text-sm text-gray-900 dark:text-white">${data.username}</span>
+                                        <span class="text-gray-500 text-[10px] uppercase tracking-wider">${data.created_at || 'Just now'}</span>
+                                    </div>
                                 </div>
-                                <p class="text-sm mt-0.5">${data.content}</p>
+                                <p class="text-sm mt-0.5 text-gray-700 dark:text-gray-300">${data.content}</p>
                             </div>
                         </div>`;
                     list.insertAdjacentHTML('afterbegin', newComment);
@@ -196,7 +232,23 @@
             });
         }
 
-        // LIKES SYSTEM
+        function deleteComment(commentId, postId) {
+            if (!confirm("Sigurado ka?")) return;
+            fetch(`/delete_comment/${commentId}`, { method: 'POST' })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    const el = document.getElementById(`comment-${commentId}`);
+                    const count = document.getElementById(`comment-count-${postId}`);
+                    el.style.opacity = '0';
+                    setTimeout(() => {
+                        el.remove();
+                        count.innerText = parseInt(count.innerText) - 1;
+                    }, 300);
+                }
+            });
+        }
+
         function handleLike(postId) {
             fetch(`/like/${postId}`, { method: 'POST' })
             .then(res => res.json())

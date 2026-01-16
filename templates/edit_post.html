@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html lang="en" class="">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Edit: {{ post.title }} | Seven33 Blog</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script>
-  tailwind.config = { darkMode: 'class' };
-</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit: {{ post.title }} | Seven33 Blog</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' };
+    </script>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
 
@@ -23,12 +23,41 @@
 
 <div class="max-w-3xl mx-auto p-6 bg-white dark:bg-gray-800 rounded shadow mt-6 transition-colors duration-300">
     <h1 class="text-2xl font-bold mb-4">Edit Post</h1>
-    <form method="POST" class="space-y-4">
-        <input type="text" name="title" placeholder="Post Title" value="{{ post.title }}" required
-               class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
-        <textarea name="content" placeholder="Post Content" rows="10" required
-                  class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">{{ post.content }}</textarea>
-        <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition">Update Post</button>
+    
+    <form method="POST" enctype="multipart/form-data" class="space-y-4">
+        
+        <div>
+            <label class="block text-sm font-medium mb-1">Title</label>
+            <input type="text" name="title" placeholder="Post Title" value="{{ post.title }}" required
+                   class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium mb-1">Content</label>
+            <textarea name="content" placeholder="Post Content" rows="8" required
+                      class="w-full p-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">{{ post.content }}</textarea>
+        </div>
+
+        <div class="p-4 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+            <label class="block text-sm font-bold mb-2 text-blue-500">Update Media (Optional)</label>
+            
+            {% if post.media_file %}
+                <div class="mb-4">
+                    <p class="text-xs text-gray-500 mb-2">Current Media:</p>
+                    {% if post.media_type == 'video' %}
+                        <video src="{{ post.media_file }}" controls class="w-48 rounded shadow-md"></video>
+                    {% else %}
+                        <img src="{{ post.media_file }}" alt="Current" class="w-48 h-32 object-cover rounded shadow-md">
+                    {% endif %}
+                </div>
+            {% endif %}
+
+            <input type="file" name="media_file" accept="image/*,video/*"
+                   class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-gray-700 dark:file:text-gray-200">
+            <p class="text-[10px] text-gray-400 mt-2 italic">*Leave empty to keep current photo/video.</p>
+        </div>
+
+        <button type="submit" class="w-full md:w-auto px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded shadow transition">Update Post</button>
     </form>
 </div>
 
