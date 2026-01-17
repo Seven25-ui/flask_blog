@@ -133,12 +133,12 @@ def utility_processor():
 
     def time_ago(date):
         if not date: return ""
-        now = ph_time() # Gamiton ang PH time para sa comparison
+        now = ph_time() 
         diff = now - date
-        
+
         if diff.total_seconds() < 60:
             return "just now"
-        
+
         periods = (
             (diff.days // 365, "year", "years"),
             (diff.days // 30, "month", "months"),
@@ -151,6 +151,18 @@ def utility_processor():
             if period >= 1:
                 return f"{period} {singular if period == 1 else plural} ago"
         return "just now"
+
+    # --- KANI ANG BAG-O NGA GI-ADD PARA SA STATUS ---
+    def get_user_status(user_id):
+        user = db.session.get(User, user_id)
+        if not user: return "Offline"
+        
+        # 5 minutes (300 seconds) limit para sa Online status
+        if user.last_seen and (ph_time() - user.last_seen).total_seconds() < 300:
+            return "Online"
+        
+        return f"Active {time_ago(user.last_seen)}" if user.last_seen else "Offline"
+    # -----------------------------------------------
 
     def user_has_liked(user_id, post_id):
         if not user_id: return False
@@ -176,12 +188,15 @@ def utility_processor():
         get_user_by_username=get_user_by_username,
         get_read_time=get_read_time,
         time_ago=time_ago,
+        get_user_status=get_user_status, # GI-APIL NA DIRI
         user_has_liked=user_has_liked,
         get_like_count=get_like_count,
         get_comment_count=get_comment_count,
         get_comments_for_post=get_comments_for_post,
         get_follower_count=get_follower_count,
-        is_following=is_following
+        is_following=is_following,
+        unread_count=Message.query.filter_by(receiver_id=session.get('user_id'), is_read=False).count() if 'user_id' in session else 0,
+        now_utc=ph_time()
     )
 
 # --- 4. ROUTES ---
@@ -578,6 +593,8 @@ def react_message(message_id):
     except Exception as e:
         db.session.rollback()
         return {"status": "error"}, 500
+
+
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5000)
