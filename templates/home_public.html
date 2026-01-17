@@ -69,6 +69,7 @@
             </div>
             <nav class="space-y-6">
                 <a href="{{ url_for('public_home') }}" class="flex items-center gap-4 text-lg font-bold hover:text-skyBlue transition">🏠 Home</a>
+                <a href="{{ url_for('inbox') }}" class="flex items-center gap-4 text-lg font-bold hover:text-skyBlue transition">📩 Messages</a>
                 <a href="{{ url_for('dashboard') }}" class="flex items-center gap-4 text-lg font-bold hover:text-skyBlue transition">📊 Dashboard</a>
                 <a href="{{ url_for('profile_settings') }}" class="flex items-center gap-4 text-lg font-bold hover:text-skyBlue transition">⚙️ Settings</a>
                 <a href="{{ url_for('create_post') }}" class="flex items-center gap-4 text-lg font-bold hover:text-skyBlue transition">➕ New Post</a>
@@ -99,7 +100,18 @@
 
         <div class="divide-y dark:divide-gray-800">
             {% for post in posts %}
-            <article class="p-4 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition">
+            <article class="p-4 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition relative">
+                
+                {% if user and user.username == post.author %}
+                <div class="absolute top-4 right-4 z-10">
+                    <form action="{{ url_for('delete_post', post_id=post.id) }}" method="POST" onsubmit="return confirm('Sigurado ka i-delete ni, Aloy?');">
+                        <button type="submit" class="text-gray-400 hover:text-red-500 p-1">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                    </form>
+                </div>
+                {% endif %}
+
                 <div class="flex gap-3">
                     <div class="flex-shrink-0">
                         {% set p_user = get_user_by_username(post.author) %}
@@ -115,7 +127,7 @@
                             <span class="text-gray-500 text-sm">· {{ time_ago(post.created_at) }}</span>
                         </div>
 
-                        <a href="/post/{{ post.slug }}" class="block">
+                        <a href="/post/{{ post.slug }}" class="block pr-6">
                             <h2 class="text-[1.1rem] font-bold leading-tight mb-1">{{ post.title }}</h2>
                             <p class="text-gray-600 dark:text-gray-300 text-[0.95rem] line-clamp-3 mb-2">{{ post.content | striptags }}</p>
                         </a>
@@ -200,27 +212,25 @@
 
     <div class="fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg border-t dark:border-gray-800 sm:hidden">
         <div class="flex justify-around items-center py-3">
-            <a href="{{ url_for('public_home') }}" class="text-skyBlue">
+            <a href="{{ url_for('public_home') }}" class="{{ 'text-skyBlue' if active_tab in ['discover', 'following'] or not active_tab else 'text-gray-400' }}">
                 <svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.1L2 11h3v9h6v-5h2v5h6v-9h3L12 2.1z"/></svg>
             </a>
-            <a href="#" class="text-gray-400"><svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg></a>
+            <a href="{{ url_for('inbox') }}" class="{{ 'text-skyBlue' if active_tab == 'messages' else 'text-gray-400' }}">
+                <svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+            </a>
             <a href="{{ url_for('create_post') }}" class="text-gray-400"><svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6-h2v-6H5v-2h6V5h2v6h6v2z"/></svg></a>
-            <a href="{{ url_for('profile_settings') }}" class="w-7 h-7 rounded-full overflow-hidden border-2 border-gray-300">
+            <a href="{{ url_for('profile_settings') }}" class="w-7 h-7 rounded-full overflow-hidden border-2 {{ 'border-skyBlue' if active_tab == 'settings' else 'border-gray-300' }}">
                 <img src="{{ user.profile_pic if user and user.profile_pic else 'https://ui-avatars.com/api/?name=' + (user.username if user else 'Guest') }}" class="w-full h-full object-cover">
             </a>
         </div>
     </div>
 
     <script>
-        // PWA SERVICE WORKER REGISTRATION
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js')
-                .then(reg => console.log('SE7EN PWA Ready'))
-                .catch(err => console.log('PWA Error', err));
+                navigator.serviceWorker.register('/sw.js').catch(err => console.log('PWA Error', err));
             });
         }
-
         function toggleMenu() {
             document.getElementById('sideMenu').classList.toggle('-translate-x-full');
             document.getElementById('overlay').classList.toggle('hidden');

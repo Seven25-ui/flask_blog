@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Messages | SE7EN</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .chat-container::-webkit-scrollbar { width: 5px; }
+        .chat-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .message-bubble { transition: all 0.2s ease; }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-950 text-gray-900 dark:text-gray-100 transition-colors duration-300">
+
+    <div class="flex h-screen flex-col">
+        <nav class="h-16 bg-white dark:bg-gray-900 border-b dark:border-gray-800 flex items-center justify-between px-6 z-10 shadow-sm">
+            <div class="flex items-center gap-4">
+                <a href="{{ url_for('public_home') }}" class="text-2xl font-black text-blue-600 tracking-tighter">SE7EN</a>
+            </div>
+            <div class="flex items-center gap-5">
+                <a href="{{ url_for('inbox') }}" class="hover:text-blue-500 transition"><i class="fa-solid fa-envelope text-xl"></i></a>
+                <img src="{{ user.profile_pic if user else 'https://ui-avatars.com/api/?name=User' }}" class="w-9 h-9 rounded-full border-2 border-blue-500 p-0.5">
+            </div>
+        </nav>
+
+        <div class="flex flex-1 overflow-hidden">
+            <div class="w-full md:w-80 bg-white dark:bg-gray-900 border-r dark:border-gray-800 flex flex-col {{ 'hidden md:flex' if selected_user }}">
+                <div class="p-5 border-b dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-900/50">
+                    <h2 class="text-xl font-bold">Chats</h2>
+                    <button class="p-2 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-full transition"><i class="fa-solid fa-pen-to-square"></i></button>
+                </div>
+                <div class="overflow-y-auto flex-1">
+                    {% for partner in partners %}
+                    <a href="{{ url_for('inbox', user_id=partner.id) }}" class="flex items-center gap-3 p-4 hover:bg-blue-50 dark:hover:bg-gray-800/50 transition-colors {{ 'bg-blue-50 dark:bg-blue-900/20 border-r-4 border-blue-500' if selected_user and selected_user.id == partner.id }}">
+                        <div class="relative">
+                            <img src="{{ partner.profile_pic or 'https://ui-avatars.com/api/?name=' + partner.username }}" class="w-12 h-12 rounded-full object-cover border dark:border-gray-700">
+                            {% if partner.last_seen and time_ago(partner.last_seen) == 'just now' %}
+                            <div class="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-white dark:border-gray-900 rounded-full"></div>
+                            {% endif %}
+                        </div>
+                        <div class="flex-1 overflow-hidden">
+                            <span class="font-bold block truncate">{{ partner.username }}</span>
+                            <span class="text-xs text-gray-500 truncate block">
+                                {% if partner.last_seen and time_ago(partner.last_seen) == 'just now' %}
+                                    <span class="text-green-500">Active now</span>
+                                {% else %}
+                                    Active {{ time_ago(partner.last_seen) if partner.last_seen else 'long ago' }}
+                                {% endif %}
+                            </span>
+                        </div>
+                    </a>
+                    {% endfor %}
+                    {% if not partners %}
+                    <div class="p-10 text-center text-gray-500 text-sm italic">No chats yet.</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="flex-1 flex flex-col bg-gray-50 dark:bg-[#0b0e11] {{ 'hidden' if not selected_user }} {{ 'flex' if selected_user }}">
+                {% if selected_user %}
+                    <div class="p-4 bg-white dark:bg-gray-900 border-b dark:border-gray-800 flex items-center gap-3 shadow-sm">
+                        <a href="{{ url_for('inbox') }}" class="md:hidden text-gray-500 p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full"><i class="fa-solid fa-arrow-left"></i></a>
+                        <img src="{{ selected_user.profile_pic or 'https://ui-avatars.com/api/?name=' + selected_user.username }}" class="w-10 h-10 rounded-full border dark:border-gray-700">
+                        <div>
+                            <h3 class="font-bold leading-none">{{ selected_user.username }}</h3>
+                            <span class="text-[10px] font-medium">
+                                {% if selected_user.last_seen and time_ago(selected_user.last_seen) == 'just now' %}
+                                    <span class="text-green-500 tracking-wide uppercase">● Online now</span>
+                                {% else %}
+                                    <span class="text-gray-400">Last seen: {{ time_ago(selected_user.last_seen) if selected_user.last_seen else 'Unknown' }}</span>
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div id="chat-box" class="flex-1 overflow-y-auto p-4 space-y-4 chat-container">
+                        {% for msg in active_chat %}
+                        <div class="flex {{ 'justify-end' if msg.sender_id == session['user_id'] else 'justify-start' }}">
+                            <div class="max-w-[75%] flex flex-col {{ 'items-end' if msg.sender_id == session['user_id'] else 'items-start' }}">
+                                <div class="px-4 py-2.5 rounded-2xl text-[0.92rem] shadow-sm message-bubble {{ 'bg-blue-600 text-white rounded-br-none' if msg.sender_id == session['user_id'] else 'bg-white dark:bg-gray-800 border dark:border-gray-700 text-gray-800 dark:text-gray-100 rounded-bl-none' }}">
+                                    {{ msg.content }}
+                                </div>
+                                <div class="flex items-center gap-1 mt-1 text-[9px] text-gray-400 uppercase tracking-wider font-medium">
+                                    {{ msg.created_at.strftime('%I:%M %p') }}
+                                    {% if msg.sender_id == session['user_id'] %}
+                                        <i class="fa-solid fa-check-double text-blue-400"></i>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="p-4 bg-white dark:bg-gray-900 border-t dark:border-gray-800">
+                        <form action="{{ url_for('send_message', receiver_id=selected_user.id) }}" method="POST" class="flex items-center gap-3">
+                            <input type="text" name="content" required placeholder="Write a message..." autocomplete="off" autofocus 
+                                   class="flex-1 bg-gray-100 dark:bg-gray-800 rounded-full px-5 py-3 outline-none focus:ring-2 focus:ring-blue-500 border border-transparent dark:border-gray-700 transition-all">
+                            <button type="submit" class="w-11 h-11 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center transition-all shadow-md active:scale-90">
+                                <i class="fa-solid fa-paper-plane"></i>
+                            </button>
+                        </form>
+                    </div>
+                {% else %}
+                    <div class="flex-1 flex flex-col items-center justify-center text-gray-500">
+                        <div class="w-20 h-20 bg-gray-200 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
+                            <i class="fa-solid fa-comments text-3xl"></i>
+                        </div>
+                        <p class="font-medium">Pili og ka-chat para makasugod.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Auto scroll to bottom
+        window.onload = function() {
+            const chatBox = document.getElementById('chat-box');
+            if (chatBox) {
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        };
+
+        // Dark mode persist
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.documentElement.classList.add('dark');
+        }
+    </script>
+</body>
+</html>
