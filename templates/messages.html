@@ -9,10 +9,67 @@
     <style>
         .chat-container::-webkit-scrollbar { width: 5px; }
         .chat-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-        .message-bubble { transition: all 0.2s ease; }
+        .message-bubble { transition: all 0.2s ease; cursor: pointer; -webkit-tap-highlight-color: transparent; position: relative; }
+        .message-bubble:active { transform: scale(0.96); opacity: 0.9; }
+
+        /* Messenger-style Context Menu */
+        #context-menu {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            width: 180px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            overflow: hidden;
+            animation: popIn 0.15s ease-out;
+        }
+        .dark #context-menu { background: #1f2937; border: 1px solid #374151; }
+
+        @keyframes popIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .menu-item { padding: 12px 16px; display: flex; align-items: center; gap: 12px; font-size: 14px; cursor: pointer; transition: 0.2s; }
+        .menu-item:hover { background: #f3f4f6; }
+        .dark .menu-item:hover { background: #374151; }
+
+        .reaction-bar { display: flex; justify-content: space-around; padding: 10px; border-bottom: 1px solid #eee; background: #f9fafb; }
+        .dark .reaction-bar { border-bottom: 1px solid #374151; background: #111827; }
+        .reaction-btn { font-size: 22px; transition: transform 0.2s; cursor: pointer; }
+        .reaction-btn:hover { transform: scale(1.4); }
+
+        .reaction-badge {
+            position: absolute;
+            bottom: -12px;
+            padding: 2px 6px;
+            border-radius: 12px;
+            font-size: 12px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+
+        #reply-preview-container { transition: all 0.3s ease; }
     </style>
 </head>
 <body class="bg-gray-100 dark:bg-gray-950 text-gray-900 dark:text-gray-100 transition-colors duration-300">
+
+    <div id="context-menu">
+        <div class="reaction-bar">
+            <span class="reaction-btn" onclick="handleAction('react', '❤️')">❤️</span>
+            <span class="reaction-btn" onclick="handleAction('react', '👍')">👍</span>
+            <span class="reaction-btn" onclick="handleAction('react', '😂')">😂</span>
+            <span class="reaction-btn" onclick="handleAction('react', '😮')">😮</span>
+            <span class="reaction-btn" onclick="handleAction('react', '😢')">😢</span>
+        </div>
+        <div class="menu-item" onclick="handleAction('reply')">
+            <i class="fa-solid fa-reply text-blue-500"></i> Reply
+        </div>
+        <div id="delete-option" class="menu-item text-red-500" onclick="handleAction('delete')">
+            <i class="fa-solid fa-trash"></i> Delete
+        </div>
+    </div>
 
     <div class="flex h-screen flex-col">
         <nav class="h-16 bg-white dark:bg-gray-900 border-b dark:border-gray-800 flex items-center justify-between px-6 z-10 shadow-sm">
@@ -27,87 +84,77 @@
 
         <div class="flex flex-1 overflow-hidden">
             <div class="w-full md:w-80 bg-white dark:bg-gray-900 border-r dark:border-gray-800 flex flex-col {{ 'hidden md:flex' if selected_user }}">
-                <div class="p-5 border-b dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-900/50">
-                    <h2 class="text-xl font-bold">Chats</h2>
-                    <button class="p-2 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-full transition"><i class="fa-solid fa-pen-to-square"></i></button>
-                </div>
+                <div class="p-5 border-b dark:border-gray-800 flex justify-between items-center text-xl font-bold">Chats</div>
                 <div class="overflow-y-auto flex-1">
                     {% for partner in partners %}
                     <a href="{{ url_for('inbox', user_id=partner.id) }}" class="flex items-center gap-3 p-4 hover:bg-blue-50 dark:hover:bg-gray-800/50 transition-colors {{ 'bg-blue-50 dark:bg-blue-900/20 border-r-4 border-blue-500' if selected_user and selected_user.id == partner.id }}">
-                        <div class="relative">
-                            <img src="{{ partner.profile_pic or 'https://ui-avatars.com/api/?name=' + partner.username }}" class="w-12 h-12 rounded-full object-cover border dark:border-gray-700">
-                            {% if partner.last_seen and time_ago(partner.last_seen) == 'just now' %}
-                            <div class="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-white dark:border-gray-900 rounded-full"></div>
-                            {% endif %}
-                        </div>
+                        <img src="{{ partner.profile_pic or 'https://ui-avatars.com/api/?name=' + partner.username }}" class="w-12 h-12 rounded-full object-cover">
                         <div class="flex-1 overflow-hidden">
                             <span class="font-bold block truncate">{{ partner.username }}</span>
-                            <span class="text-xs text-gray-500 truncate block">
-                                {% if partner.last_seen and time_ago(partner.last_seen) == 'just now' %}
-                                    <span class="text-green-500">Active now</span>
-                                {% else %}
-                                    Active {{ time_ago(partner.last_seen) if partner.last_seen else 'long ago' }}
-                                {% endif %}
-                            </span>
+                            <span class="text-xs text-gray-500 truncate block">Active {{ time_ago(partner.last_seen) if partner.last_seen else 'long ago' }}</span>
                         </div>
                     </a>
                     {% endfor %}
-                    {% if not partners %}
-                    <div class="p-10 text-center text-gray-500 text-sm italic">No chats yet.</div>
-                    {% endif %}
                 </div>
             </div>
 
             <div class="flex-1 flex flex-col bg-gray-50 dark:bg-[#0b0e11] {{ 'hidden' if not selected_user }} {{ 'flex' if selected_user }}">
                 {% if selected_user %}
                     <div class="p-4 bg-white dark:bg-gray-900 border-b dark:border-gray-800 flex items-center gap-3 shadow-sm">
-                        <a href="{{ url_for('inbox') }}" class="md:hidden text-gray-500 p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full"><i class="fa-solid fa-arrow-left"></i></a>
-                        <img src="{{ selected_user.profile_pic or 'https://ui-avatars.com/api/?name=' + selected_user.username }}" class="w-10 h-10 rounded-full border dark:border-gray-700">
-                        <div>
-                            <h3 class="font-bold leading-none">{{ selected_user.username }}</h3>
-                            <span class="text-[10px] font-medium">
-                                {% if selected_user.last_seen and time_ago(selected_user.last_seen) == 'just now' %}
-                                    <span class="text-green-500 tracking-wide uppercase">● Online now</span>
-                                {% else %}
-                                    <span class="text-gray-400">Last seen: {{ time_ago(selected_user.last_seen) if selected_user.last_seen else 'Unknown' }}</span>
-                                {% endif %}
-                            </span>
-                        </div>
+                        <a href="{{ url_for('inbox') }}" class="md:hidden text-gray-500 p-2"><i class="fa-solid fa-arrow-left"></i></a>
+                        <img src="{{ selected_user.profile_pic or 'https://ui-avatars.com/api/?name=' + selected_user.username }}" class="w-10 h-10 rounded-full">
+                        <h3 class="font-bold">{{ selected_user.username }}</h3>
                     </div>
 
-                    <div id="chat-box" class="flex-1 overflow-y-auto p-4 space-y-4 chat-container">
+                    <div id="chat-box" class="flex-1 overflow-y-auto p-4 space-y-8 chat-container">
                         {% for msg in active_chat %}
-                        <div class="flex {{ 'justify-end' if msg.sender_id == session['user_id'] else 'justify-start' }}">
-                            <div class="max-w-[75%] flex flex-col {{ 'items-end' if msg.sender_id == session['user_id'] else 'items-start' }}">
-                                <div class="px-4 py-2.5 rounded-2xl text-[0.92rem] shadow-sm message-bubble {{ 'bg-blue-600 text-white rounded-br-none' if msg.sender_id == session['user_id'] else 'bg-white dark:bg-gray-800 border dark:border-gray-700 text-gray-800 dark:text-gray-100 rounded-bl-none' }}">
-                                    {{ msg.content }}
+                        <div class="flex {{ 'justify-end' if msg.sender_id == session['user_id'] else 'justify-start' }}" id="msg-container-{{ msg.id }}">
+                            <div class="max-w-[75%] flex flex-col {{ 'items-end' if msg.sender_id == session['user_id'] else 'items-start' }} relative">
+
+                                {% if msg.parent_id %}
+                                <div class="text-[10px] bg-gray-200 dark:bg-gray-800 px-3 py-1 mb-[-8px] pb-3 rounded-t-xl opacity-70 border-b dark:border-gray-700 italic max-w-full truncate">
+                                    <i class="fa-solid fa-reply mr-1"></i> {{ msg.parent_message.content if msg.parent_message else "Message deleted" }}
                                 </div>
+                                {% endif %}
+
+                                <div class="px-4 py-2.5 rounded-2xl text-[0.92rem] shadow-sm message-bubble {{ 'bg-blue-600 text-white rounded-br-none' if msg.sender_id == session['user_id'] else 'bg-white dark:bg-gray-800 border dark:border-gray-700 text-gray-800 dark:text-gray-100 rounded-bl-none' }}"
+                                     onmousedown="handlePressStart(event, {{ msg.id }}, {{ 'true' if msg.sender_id == session['user_id'] else 'false' }}, '{{ msg.content|e }}')"
+                                     ontouchstart="handlePressStart(event, {{ msg.id }}, {{ 'true' if msg.sender_id == session['user_id'] else 'false' }}, '{{ msg.content|e }}')"
+                                     onmouseup="handlePressEnd()" ontouchend="handlePressEnd()">
+                                    {{ msg.content }}
+
+                                    {% if msg.reaction %}
+                                    <div class="reaction-badge bg-white dark:bg-gray-700 border dark:border-gray-600 {{ 'right-0' if msg.sender_id == session['user_id'] else 'left-0' }}">
+                                        {{ msg.reaction }}
+                                    </div>
+                                    {% endif %}
+                                </div>
+
                                 <div class="flex items-center gap-1 mt-1 text-[9px] text-gray-400 uppercase tracking-wider font-medium">
                                     {{ msg.created_at.strftime('%I:%M %p') }}
-                                    {% if msg.sender_id == session['user_id'] %}
-                                        <i class="fa-solid fa-check-double text-blue-400"></i>
-                                    {% endif %}
                                 </div>
                             </div>
                         </div>
                         {% endfor %}
                     </div>
 
-                    <div class="p-4 bg-white dark:bg-gray-900 border-t dark:border-gray-800">
-                        <form action="{{ url_for('send_message', receiver_id=selected_user.id) }}" method="POST" class="flex items-center gap-3">
-                            <input type="text" name="content" required placeholder="Write a message..." autocomplete="off" autofocus 
-                                   class="flex-1 bg-gray-100 dark:bg-gray-800 rounded-full px-5 py-3 outline-none focus:ring-2 focus:ring-blue-500 border border-transparent dark:border-gray-700 transition-all">
-                            <button type="submit" class="w-11 h-11 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center transition-all shadow-md active:scale-90">
+                    <div class="bg-white dark:bg-gray-900 border-t dark:border-gray-800">
+                        <div id="reply-preview-container" class="hidden px-4 py-2 bg-gray-100 dark:bg-gray-800 flex justify-between items-center border-b dark:border-gray-700">
+                            <div class="flex flex-col border-l-4 border-blue-500 pl-3">
+                                <span class="text-[10px] font-bold text-blue-500 uppercase">Replying to</span>
+                                <span id="reply-text-preview" class="text-xs text-gray-500 truncate italic"></span>
+                            </div>
+                            <button onclick="cancelReply()" class="text-gray-400 hover:text-red-500"><i class="fa-solid fa-circle-xmark"></i></button>
+                        </div>
+
+                        <form action="{{ url_for('send_message', receiver_id=selected_user.id) }}" method="POST" class="p-4 flex items-center gap-3">
+                            <input type="hidden" name="parent_id" id="parent-id-input">
+                            <input type="text" name="content" id="message-input" required placeholder="Write a message..." autocomplete="off"
+                                   class="flex-1 bg-gray-100 dark:bg-gray-800 rounded-full px-5 py-3 outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700">
+                            <button type="submit" class="w-11 h-11 bg-blue-600 text-white rounded-full flex items-center justify-center shadow-md active:scale-90 transition-all">
                                 <i class="fa-solid fa-paper-plane"></i>
                             </button>
                         </form>
-                    </div>
-                {% else %}
-                    <div class="flex-1 flex flex-col items-center justify-center text-gray-500">
-                        <div class="w-20 h-20 bg-gray-200 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
-                            <i class="fa-solid fa-comments text-3xl"></i>
-                        </div>
-                        <p class="font-medium">Pili og ka-chat para makasugod.</p>
                     </div>
                 {% endif %}
             </div>
@@ -115,18 +162,69 @@
     </div>
 
     <script>
-        // Auto scroll to bottom
-        window.onload = function() {
-            const chatBox = document.getElementById('chat-box');
-            if (chatBox) {
-                chatBox.scrollTop = chatBox.scrollHeight;
-            }
-        };
+        let pressTimer;
+        let selectedMsgId = null;
+        let isOwnMessage = false;
+        let selectedMsgText = "";
 
-        // Dark mode persist
-        if (localStorage.getItem('darkMode') === 'true') {
-            document.documentElement.classList.add('dark');
+        function handlePressStart(e, msgId, own, text) {
+            selectedMsgId = msgId;
+            isOwnMessage = own;
+            selectedMsgText = text;
+
+            const posX = e.pageX || (e.touches ? e.touches[0].pageX : 0);
+            const posY = e.pageY || (e.touches ? e.touches[0].pageY : 0);
+
+            pressTimer = setTimeout(() => {
+                const menu = document.getElementById('context-menu');
+                document.getElementById('delete-option').style.display = isOwnMessage ? 'flex' : 'none';
+
+                menu.style.display = 'block';
+                menu.style.left = Math.min(posX, window.innerWidth - 190) + 'px';
+                menu.style.top = Math.min(posY, window.innerHeight - 250) + 'px';
+
+                if (navigator.vibrate) navigator.vibrate(40);
+            }, 600);
         }
+
+        function handlePressEnd() { clearTimeout(pressTimer); }
+
+        async function handleAction(action, value = null) {
+            document.getElementById('context-menu').style.display = 'none';
+
+            if (action === 'delete') {
+                if (confirm('Papason gyud ni nimo?')) window.location.href = `/delete_message/${selectedMsgId}`;
+            } else if (action === 'reply') {
+                document.getElementById('reply-preview-container').classList.remove('hidden');
+                document.getElementById('reply-text-preview').innerText = selectedMsgText;
+                document.getElementById('parent-id-input').value = selectedMsgId;
+                document.getElementById('message-input').focus();
+            } else if (action === 'react') {
+                try {
+                    const response = await fetch(`/react_message/${selectedMsgId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ reaction: value })
+                    });
+                    if (response.ok) window.location.reload();
+                } catch (err) {
+                    console.error("Reaction failed:", err);
+                }
+            }
+        }
+
+        function cancelReply() {
+            document.getElementById('reply-preview-container').classList.add('hidden');
+            document.getElementById('parent-id-input').value = "";
+        }
+
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('context-menu');
+            if (!menu.contains(e.target)) menu.style.display = 'none';
+        });
+
+        const chatBox = document.getElementById('chat-box');
+        if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
     </script>
 </body>
 </html>

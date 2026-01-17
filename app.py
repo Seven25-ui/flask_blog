@@ -89,10 +89,19 @@ class Message(db.Model):
     sender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     receiver_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     content = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, default=ph_time) # Gi-sync sa PH time
+    created_at = db.Column(db.DateTime, default=ph_time) # Pabilin ang PH time
     is_read = db.Column(db.Boolean, default=False)
+    
+    # 1. DUGANG: Parent ID para sa Reply link
+    parent_id = db.Column(db.Integer, db.ForeignKey('message.id'), nullable=True)
+    
+    # Existing relationships
     sender = db.relationship('User', foreign_keys=[sender_id], backref='sent_messages')
     receiver = db.relationship('User', foreign_keys=[receiver_id], backref='received_messages')
+    
+    # 2. DUGANG: Relationship para makuha ang content sa gi-replyan
+    parent_message = db.relationship('Message', remote_side=[id], backref='replies')
+    reaction = db.Column(db.String(20), nullable=True)
 
 # --- 3. HELPERS & UTILITIES ---
 
@@ -500,16 +509,75 @@ def inbox(user_id=None):
 @login_required
 def send_message(receiver_id):
     content = request.form.get('content')
+    parent_id = request.form.get('parent_id') # Gikan sa hidden input sa message.html
+    
+    # Check kung empty ba ang content
     if not content or not content.strip():
         return redirect(request.referrer or url_for('inbox', user_id=receiver_id))
-    new_msg = Message(sender_id=session['user_id'], receiver_id=receiver_id, content=content.strip())
+    
+    # I-process ang parent_id (kung naay gi-replyan o wala)
+    p_id = None
+    if parent_id and parent_id.isdigit():
+        p_id = int(parent_id)
+
+    # I-create ang bag-ong message nga naay parent_id
+    new_msg = Message(
+        sender_id=session['user_id'], 
+        receiver_id=receiver_id, 
+        content=content.strip(),
+        parent_id=p_id
+    )
+    
     try:
         db.session.add(new_msg)
         db.session.commit()
         return redirect(url_for('inbox', user_id=receiver_id))
     except Exception as e:
         db.session.rollback()
+        # Print sa terminal para makita nimo ang error kung naa man gani
+        print(f"Error: {e}")
         return "Error sending message.", 500
+
+@app.route('/delete_message/<int:message_id>')
+@login_required
+def delete_message(message_id):
+    # Pangitaon ang message sa database gamit ang ID
+    msg = Message.query.get_or_404(message_id)
+    
+    # SECURITY CHECK: Siguroha nga ang nag-delete kay ang sender gyud
+    # Para dili mapapas sa uban ang dili ilaha nga message
+    if msg.sender_id == session.get('user_id'):
+        try:
+            # Kung naay mga reply kani nga message, 
+            # kinahanglan nato i-handle (i-set to null ang parent_id sa replies)
+            Message.query.filter_by(parent_id=message_id).update({"parent_id": None})
+            
+            db.session.delete(msg)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"Delete Error: {e}")
+            return "Error deleting message", 500
+    
+    # Inig human delete, i-balik siya sa iyang gi-gikanan nga page
+    return redirect(request.referrer or url_for('inbox'))
+
+@app.route('/react_message/<int:message_id>', methods=['POST'])
+@login_required
+def react_message(message_id):
+    data = request.get_json()
+    reaction = data.get('reaction')
+    
+    msg = Message.query.get_or_404(message_id)
+    # Pwede ra bisan kinsa mo-react (sender o receiver)
+    msg.reaction = reaction 
+    
+    try:
+        db.session.commit()
+        return {"status": "success", "reaction": reaction}, 200
+    except Exception as e:
+        db.session.rollback()
+        return {"status": "error"}, 500
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5000)
