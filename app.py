@@ -681,15 +681,23 @@ def notifications():
 
 @app.route('/api/unread-count')
 def unread_count():
-    # I-check kung naay naka-login sa session
     if 'user_id' not in session:
-        return {"count": 0}
-    
+        return {"count": 0, "messages": 0}
+
     user_id = session['user_id']
-    
-    # Gamita ang user_id gikan sa session para sa query
-    count = Notification.query.filter_by(user_id=user_id, is_read=False).count()
-    return {"count": count}
+
+    # 1. Ihap sa General Notifications (Likes, Comments, etc.)
+    notif_count = Notification.query.filter_by(user_id=user_id, is_read=False).count()
+
+    # 2. Ihap sa Private Messages (DMs)
+    # Siguroha nga ang imong Message model naay 'recipient_id' ug 'is_read'
+    msg_count = Message.query.filter_by(recipient_id=user_id, is_read=False).count()
+
+    return {
+        "count": notif_count,      # Alang sa bell icon
+        "messages": msg_count,    # Alang sa chat icon
+        "total": notif_count + msg_count
+    }
 
 @app.route('/delete_comment/<int:comment_id>', methods=['POST'])
 def delete_comment(comment_id):
@@ -716,6 +724,23 @@ def delete_comment(comment_id):
             return jsonify({"success": False, "error": str(e)}), 500
     else:
         return jsonify({"success": False, "error": "Bawal! Dili ni nimo comment."}), 403
+
+@app.route('/chat/<int:sender_id>')
+def chat(sender_id):
+    # ... imong logic sa pagkuha og messages ...
+    
+    # "Tatak" as Read:
+    unread_msgs = Message.query.filter_by(
+        sender_id=sender_id, 
+        recipient_id=session['user_id'], 
+        is_read=False
+    ).all()
+    
+    for msg in unread_msgs:
+        msg.is_read = True
+    db.session.commit()
+    
+    # ... return render_template ...
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5000)
