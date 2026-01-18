@@ -55,7 +55,7 @@ class Post(db.Model):
     author = db.Column(db.String(80), nullable=False)
     author_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     created_at = db.Column(db.DateTime, default=ph_time)
-    approved = db.Column(db.Boolean, default=False)
+    approved = db.Column(db.Boolean, default=True)
     media_file = db.Column(db.String(500), nullable=True)
     media_type = db.Column(db.String(10), nullable=True)
 
@@ -344,7 +344,7 @@ def create_post():
             slug=slug,
             author=user.username,
             author_id=user.id,
-            approved=user.is_admin,
+            approved=True,
             media_file=media_url,
             media_type=media_type
         )
@@ -467,36 +467,49 @@ def like_post(post_id):
 
 @app.route('/comment/<int:post_id>', methods=['POST'])
 def add_comment(post_id):
-    if 'user_id' not in session: return {"error": "Unauthorized"}, 401
-    
+    if 'user_id' not in session: 
+        return {"error": "Unauthorized"}, 401
+
     user = db.session.get(User, session['user_id'])
     post = Post.query.get_or_404(post_id)
-    
+
     data = request.get_json()
     content = data.get('content', '').strip()
-    if not content: return {"error": "Empty comment"}, 400
+    if not content: 
+        return {"error": "Empty comment"}, 400
 
-    # 1. Save ang comment
+    # 1. Create ang comment object
     new_comment = Comment(post_id=post_id, user_id=user.id, content=content)
     db.session.add(new_comment)
 
-    # 2. Notification Logic (Gi-fix nako ang spacing ani)
+    # 2. Notification Logic
+    # Mo-create ra og notif kung dili ang tag-iya sa post ang nag-comment
     if post.author_id != user.id:
+        # Gi-limit nato ang message preview para dili kaayo taas sa notifications list
+        preview = (content[:30] + '...') if len(content) > 30 else content
+        
         new_notif = Notification(
-            user_id=post.author_id,
-            sender_id=user.id,
+            user_id=post.author_id, # Ang makadawat (Author sa post)
+            sender_id=user.id,      # Ang nag-trigger (Kinsa ang nag-comment)
             post_id=post.id,
             notif_type='comment',
-            message=f"commented on your post: \"{content[:30]}...\""
+            message=f"commented on your post: \"{preview}\""
         )
         db.session.add(new_notif)
-    
-    # 3. Commit tanan
-    db.session.commit()
+
+    # 3. Commit tanan (Comment + Notification)
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"Database Error: {e}")
+        return {"error": "Failed to save comment"}, 500
 
     formatted_time = new_comment.created_at.strftime('%b %d, %I:%M %p')
+    
     return {
         "success": True,
+        "id": new_comment.id,  # Gi-add nako ni para sa delete function unya
         "username": user.username,
         "profile_pic": user.profile_pic if user.profile_pic else f"https://ui-avatars.com/api/?name={user.username}",
         "content": content,
@@ -532,26 +545,36 @@ def view_post(slug):
     post = Post.query.filter_by(slug=slug).first_or_404()
     return render_template('view_post.html', post=post)
 
-@app.route('/delete-post/<int:post_id>', methods=['POST'])
+@app.route('/delete/<int:post_id>', methods=['POST'])  # Gi-shorten para mo-match sa imong HTML request
 def delete_post(post_id):
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    
-    user = db.session.get(User, session['user_id'])
-    post = Post.query.get_or_404(post_id)
 
-    # Mao ni ang logic: (Kaugalingon post) OR (Siya ang Admin)
+    user = db.session.get(User, session['user_id'])
+    
+    # Mas maayo gamiton ang .get() kaysa get_or_404 para malikayan ang ghost 404 errors
+    post = db.session.get(Post, post_id)
+
+    if not post:
+        print(f"Post {post_id} not found.")
+        return redirect(url_for('dashboard'))
+
+    # CHECK: Kung siya ang tag-iya O kung Admin siya
     if post.author_id == user.id or user.is_admin:
         try:
+            # Tungod sa atong cascade setup sa Post model,
+            # ma-delete na sab apil ang Likes, Comments, ug Notifications ani.
             db.session.delete(post)
             db.session.commit()
+            print(f"Post {post_id} successfully deleted by {user.username}")
             return redirect(url_for('dashboard'))
         except Exception as e:
             db.session.rollback()
+            print(f"Delete Error: {e}")
             return f"Error deleting post: {e}", 500
     else:
-        # Kung dili tag-iya ug dili admin, pakit-on sa error
-        return "Bawal! Dili ni nimo post.", 403
+        # Security Block
+        return "Bawal! Dili ni nimo post ug dili ka Admin.", 403
 
 @app.route('/sw.js')
 def serve_sw():
@@ -667,6 +690,32 @@ def unread_count():
     # Gamita ang user_id gikan sa session para sa query
     count = Notification.query.filter_by(user_id=user_id, is_read=False).count()
     return {"count": count}
+
+@app.route('/delete_comment/<int:comment_id>', methods=['POST'])
+def delete_comment(comment_id):
+    # 1. Siguroha nga naka-login ang user
+    if 'user_id' not in session:
+        return jsonify({"success": False, "error": "Please login first"}), 401
+
+    user = db.session.get(User, session['user_id'])
+    comment = db.session.get(Comment, comment_id)
+
+    # 2. Check kung naa ba ang comment sa database
+    if not comment:
+        return jsonify({"success": False, "error": "Comment not found"}), 404
+
+    # 3. Security Check: Tag-iya ba siya sa comment O Admin ba siya?
+    # Kinahanglan pud nato i-check ang tag-iya sa post (optional pero nindot ni)
+    if comment.user_id == user.id or user.is_admin:
+        try:
+            db.session.delete(comment)
+            db.session.commit()
+            return jsonify({"success": True})
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"success": False, "error": str(e)}), 500
+    else:
+        return jsonify({"success": False, "error": "Bawal! Dili ni nimo comment."}), 403
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5000)
