@@ -13,7 +13,7 @@
 
 <header class="flex justify-between items-center p-4 bg-white dark:bg-gray-800 shadow">
     <div>
-        <a href="{{ url_for('dashboard') }}" class="text-blue-600 dark:text-blue-400 hover:underline">← Back to My Dashboard</a>
+        <a href="{{ url_for('dashboard') }}" class="text-blue-600 dark:text-blue-400 hover:underline">← Back to Dashboard</a>
     </div>
     <div class="flex items-center space-x-4">
         <button id="darkToggle" class="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition">💡</button>
@@ -23,9 +23,9 @@
 
 <div class="max-w-3xl mx-auto p-6 bg-white dark:bg-gray-800 rounded shadow mt-6 transition-colors duration-300">
     <h1 class="text-2xl font-bold mb-4">Edit Post</h1>
-    
+
     <form method="POST" enctype="multipart/form-data" class="space-y-4">
-        
+
         <div>
             <label class="block text-sm font-medium mb-1">Title</label>
             <input type="text" name="title" placeholder="Post Title" value="{{ post.title }}" required
@@ -40,7 +40,7 @@
 
         <div class="p-4 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
             <label class="block text-sm font-bold mb-2 text-blue-500">Update Media (Optional)</label>
-            
+
             {% if post.media_file %}
                 <div class="mb-4">
                     <p class="text-xs text-gray-500 mb-2">Current Media:</p>

@@ -59,15 +59,16 @@ class Post(db.Model):
     media_file = db.Column(db.String(500), nullable=True)
     media_type = db.Column(db.String(10), nullable=True)
 
-    # KINI ANG MU-FIX SA TANANG ERROR:
-    # 1. Inig delete sa Post, ma-delete sab ang tanang LIKES niini
+    # --- KINI ANG MO-FIX SA TANANG DELETE ERRORS ---
+    
+    # Inig delete sa Post, ma-delete sab ang tanang LIKES
     likes = db.relationship('Like', backref='post', cascade="all, delete-orphan", lazy=True)
-    
-    # 2. Inig delete sa Post, ma-delete sab ang tanang COMMENTS niini
+
+    # Inig delete sa Post, ma-delete sab ang tanang COMMENTS
     comments = db.relationship('Comment', backref='post', cascade="all, delete-orphan", lazy=True)
-    
-    # 3. Kung naa kay Notifications nga nakakonekta sa Post, i-add sab ni:
-    # notifications = db.relationship('Notification', backref='post', cascade="all, delete-orphan", lazy=True)
+
+    # MAO NI ANG IMPORTANTE PARA SA NOTIFICATIONS (Gi-uncomment nako)
+    notifications = db.relationship('Notification', backref='post', cascade="all, delete-orphan", lazy=True)
 
 class Reaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -378,16 +379,6 @@ def edit_post(post_id):
         return redirect(url_for('dashboard'))
     return render_template('edit_post.html', post=post)
 
-@app.route('/delete/<int:post_id>', methods=['POST'])
-@login_required
-def delete_post(post_id):
-    post = Post.query.get_or_404(post_id)
-    user = db.session.get(User, session['user_id'])
-    if post.author == user.username or user.is_admin:
-        db.session.delete(post)
-        db.session.commit()
-    return redirect(url_for('dashboard'))
-
 @app.route('/approve/<int:post_id>', methods=['POST'])
 @login_required
 def approve_post(post_id):
@@ -541,15 +532,26 @@ def view_post(slug):
     post = Post.query.filter_by(slug=slug).first_or_404()
     return render_template('view_post.html', post=post)
 
-@app.route('/delete_comment/<int:comment_id>', methods=['POST'])
-def delete_comment(comment_id):
-    if 'user_id' not in session: return {"error": "Unauthorized"}, 401
-    comment = db.session.get(Comment, comment_id)
-    if not comment: return {"error": "Comment not found"}, 404
-    if comment.user_id != session['user_id']: return {"error": "Permission denied"}, 403
-    db.session.delete(comment)
-    db.session.commit()
-    return {"success": True}
+@app.route('/delete-post/<int:post_id>', methods=['POST'])
+def delete_post(post_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    user = db.session.get(User, session['user_id'])
+    post = Post.query.get_or_404(post_id)
+
+    # Mao ni ang logic: (Kaugalingon post) OR (Siya ang Admin)
+    if post.author_id == user.id or user.is_admin:
+        try:
+            db.session.delete(post)
+            db.session.commit()
+            return redirect(url_for('dashboard'))
+        except Exception as e:
+            db.session.rollback()
+            return f"Error deleting post: {e}", 500
+    else:
+        # Kung dili tag-iya ug dili admin, pakit-on sa error
+        return "Bawal! Dili ni nimo post.", 403
 
 @app.route('/sw.js')
 def serve_sw():
@@ -629,30 +631,6 @@ def send_message(receiver_id):
         # Print sa terminal para makita nimo ang error kung naa man gani
         print(f"Error: {e}")
         return "Error sending message.", 500
-
-@app.route('/delete_message/<int:message_id>')
-@login_required
-def delete_message(message_id):
-    # Pangitaon ang message sa database gamit ang ID
-    msg = Message.query.get_or_404(message_id)
-    
-    # SECURITY CHECK: Siguroha nga ang nag-delete kay ang sender gyud
-    # Para dili mapapas sa uban ang dili ilaha nga message
-    if msg.sender_id == session.get('user_id'):
-        try:
-            # Kung naay mga reply kani nga message, 
-            # kinahanglan nato i-handle (i-set to null ang parent_id sa replies)
-            Message.query.filter_by(parent_id=message_id).update({"parent_id": None})
-            
-            db.session.delete(msg)
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            print(f"Delete Error: {e}")
-            return "Error deleting message", 500
-    
-    # Inig human delete, i-balik siya sa iyang gi-gikanan nga page
-    return redirect(request.referrer or url_for('inbox'))
 
 @app.route('/react_message/<int:message_id>', methods=['POST'])
 @login_required
