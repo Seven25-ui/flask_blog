@@ -18,9 +18,17 @@
         .sidebar-transition { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
+
+        @keyframes custom-bounce {
+            0%, 100% { transform: translateY(-10%); animation-timing-function: cubic-bezier(0.8,0,1,1); }
+            50% { transform: none; animation-timing-function: cubic-bezier(0,0,0.2,1); }
+        }
+        .animate-notif { animation: custom-bounce 1s infinite; }
     </style>
 </head>
 <body class="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
+
+    <audio id="notifSound" src="https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3" preload="auto"></audio>
 
     <nav class="sticky top-0 z-40 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border-b dark:border-gray-800">
         <div class="max-w-2xl mx-auto px-4 py-3 flex justify-between items-center relative">
@@ -96,60 +104,17 @@
                         <p class="text-[11px] text-gray-400 mt-1 font-bold uppercase tracking-widest">
                             {{ post.created_at.strftime('%B %d, %Y') }}
                         </p>
-
-                        {% if post.hashtags %}
-                        <div class="flex flex-wrap gap-1.5 mt-2">
-                            {% for tag in post.hashtags.split(',') %}
-                                {% if tag.strip() %}
-                                <span class="text-[10px] font-black text-skyBlue uppercase tracking-tighter bg-skyBlue/5 px-2 py-0.5 rounded-md">
-                                    #{{ tag.strip() }}
-                                </span>
-                                {% endif %}
-                            {% endfor %}
-                        </div>
-                        {% endif %}
                     </div>
-
-                    {% if post.media_file %}
-                    <div class="rounded-2xl overflow-hidden border dark:border-gray-800 bg-gray-100 dark:bg-gray-800 mb-4">
-                        {% if post.media_type == 'video' %}
-                            <video class="w-full aspect-video object-cover" src="{{ post.media_file }}" controls></video>
-                        {% else %}
-                            <img src="{{ post.media_file }}" class="w-full aspect-video object-cover">
-                        {% endif %}
-                    </div>
-                    {% endif %}
 
                     <div class="flex flex-wrap gap-2">
-                        <a href="{{ url_for('view_post', slug=post.slug) }}" class="flex-1 min-w-[80px] py-3 text-center bg-gray-100 dark:bg-gray-800 rounded-2xl text-xs font-black hover:bg-gray-200 dark:hover:bg-gray-700 transition">
-                            VIEW
-                        </a>
-                        
-                        {% if user.is_admin and not post.approved %}
-                        <form action="{{ url_for('approve_post', post_id=post.id) }}" method="POST" class="flex-1 min-w-[80px]">
-                            <button type="submit" class="w-full py-3 text-center bg-green-500 text-white rounded-2xl text-xs font-black hover:bg-green-600 transition">
-                                APPROVE
-                            </button>
-                        </form>
-                        {% endif %}
-
-                        <a href="{{ url_for('edit_post', post_id=post.id) }}" class="flex-1 min-w-[80px] py-3 text-center bg-skyBlue/10 text-skyBlue rounded-2xl text-xs font-black hover:bg-skyBlue hover:text-white transition">
-                            EDIT
-                        </a>
+                        <a href="{{ url_for('view_post', slug=post.slug) }}" class="flex-1 min-w-[80px] py-3 text-center bg-gray-100 dark:bg-gray-800 rounded-2xl text-xs font-black hover:bg-gray-200 dark:hover:bg-gray-700 transition">VIEW</a>
+                        <a href="{{ url_for('edit_post', post_id=post.id) }}" class="flex-1 min-w-[80px] py-3 text-center bg-skyBlue/10 text-skyBlue rounded-2xl text-xs font-black hover:bg-skyBlue hover:text-white transition">EDIT</a>
                         <form action="{{ url_for('delete_post', post_id=post.id) }}" method="POST" class="flex-1 min-w-[80px]" onsubmit="return confirmDelete(event)">
-                            <button type="submit" class="w-full py-3 text-center bg-red-50 dark:bg-red-900/20 text-red-500 rounded-2xl text-xs font-black hover:bg-red-500 hover:text-white transition">
-                                DELETE
-                            </button>
+                            <button type="submit" class="w-full py-3 text-center bg-red-50 dark:bg-red-900/20 text-red-500 rounded-2xl text-xs font-black hover:bg-red-500 hover:text-white transition">DELETE</button>
                         </form>
                     </div>
                 </article>
                 {% endfor %}
-            {% else %}
-                <div class="py-24 px-6 text-center">
-                    <div class="text-5xl mb-4">✍️</div>
-                    <p class="text-gray-500 font-bold mb-6 text-lg">No posts available yet.</p>
-                    <a href="{{ url_for('create_post') }}" class="text-skyBlue font-black border-2 border-skyBlue px-6 py-2 rounded-xl hover:bg-skyBlue hover:text-white transition">Start Writing</a>
-                </div>
             {% endif %}
         </div>
     </main>
@@ -160,14 +125,30 @@
                 <svg class="w-6 h-6 text-gray-400 group-hover:text-skyBlue transition" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
                 <span class="text-[10px] font-black text-gray-400 group-hover:text-skyBlue uppercase tracking-tighter">Home</span>
             </a>
+
             <a href="{{ url_for('create_post') }}" class="flex flex-col items-center gap-1 group">
                 <svg class="w-6 h-6 text-gray-400 group-hover:text-skyBlue" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                 <span class="text-[10px] font-black text-gray-400 group-hover:text-skyBlue uppercase tracking-tighter">Post</span>
             </a>
+
+            <a href="{{ url_for('notifications') }}" class="flex flex-col items-center gap-1 group relative">
+                <div class="relative">
+                    <svg class="w-6 h-6 text-gray-400 group-hover:text-skyBlue transition" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                    </svg>
+                    <span id="notif-badge" class="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[9px] font-black h-4 min-w-[16px] px-1 flex items-center justify-center rounded-full border-2 border-white dark:border-gray-900 {% if not notification_count or notification_count == 0 %} hidden {% endif %} animate-notif">
+                        {{ notification_count if notification_count < 10 else '9+' }}
+                    </span>
+                </div>
+                <span class="text-[10px] font-black text-gray-400 group-hover:text-skyBlue uppercase tracking-tighter">Alerts</span>
+            </a>
+
             <a href="{{ url_for('dashboard') }}" class="flex flex-col items-center gap-1 group">
                 <svg class="w-6 h-6 text-skyBlue" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14h-2v-4H6v-2h4V7h2v4h4v2h-4v4z"/></svg>
-                <span class="text-[10px] font-black text-skyBlue uppercase tracking-tighter">Dashboard</span>
+                <span class="text-[10px] font-black text-skyBlue uppercase tracking-tighter">Dash</span>
             </a>
+
             <a href="{{ url_for('profile_settings') }}" class="flex flex-col items-center gap-1 group">
                 <svg class="w-6 h-6 text-gray-400 group-hover:text-skyBlue" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                 <span class="text-[10px] font-black text-gray-400 group-hover:text-skyBlue uppercase tracking-tighter">Settings</span>
@@ -182,8 +163,7 @@
         }
 
         function confirmDelete(event) {
-            // Confirmation dialog in English
-            if (confirm('Are you sure you want to delete this? This action cannot be undone.')) return true;
+            if (confirm('Are you sure? This will delete the post and all its likes/comments.')) return true;
             event.preventDefault();
             return false;
         }
@@ -193,6 +173,33 @@
             document.documentElement.classList.toggle('dark');
             localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
         });
+
+        let currentCount = parseInt("{{ notification_count or 0 }}");
+
+        function playSound() {
+            const audio = document.getElementById('notifSound');
+            audio.play().catch(e => console.log("Sound played after interaction"));
+        }
+
+        async function checkNotifications() {
+            try {
+                const response = await fetch('/api/unread-count');
+                const data = await response.json();
+                const badge = document.getElementById('notif-badge');
+
+                if (data.count > currentCount) {
+                    currentCount = data.count;
+                    badge.innerText = data.count > 9 ? '9+' : data.count;
+                    badge.classList.remove('hidden');
+                    playSound();
+                } else if (data.count === 0) {
+                    badge.classList.add('hidden');
+                }
+            } catch (error) {
+                console.error("Notif check failed");
+            }
+        }
+        setInterval(checkNotifications, 30000);
     </script>
 </body>
 </html>

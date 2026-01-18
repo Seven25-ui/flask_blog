@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SE7EN - {{ active_tab | capitalize if active_tab else 'Discover' }}</title>
-    
+
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
     <meta name="theme-color" content="#000000">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='se7en-logo.png') }}">
@@ -28,9 +28,30 @@
             to { opacity: 1; transform: translateX(0); }
         }
         .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+        
+        /* New Post Banner Animation */
+        #newPostAlert.show { transform: translate(-50%, 0); opacity: 1; }
+        #newPostAlert { transform: translate(-50%, -200%); transition: all 0.7s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
     </style>
 </head>
 <body class="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
+
+    {% if has_new_post %}
+    <div id="newPostAlert" class="fixed top-5 left-1/2 z-[100] w-[92%] max-w-sm opacity-0 pointer-events-none">
+        <div class="bg-skyBlue text-white p-4 rounded-[1.8rem] shadow-2xl flex items-center justify-between border-2 border-white/20 backdrop-blur-md pointer-events-auto">
+            <div class="flex items-center gap-3">
+                <div class="bg-white/20 p-2 rounded-xl animate-bounce text-xl">✨</div>
+                <div>
+                    <p class="text-[10px] font-black opacity-80 uppercase tracking-widest">Fresh Drop</p>
+                    <p class="text-sm font-black tracking-tight">New stories are up!</p>
+                </div>
+            </div>
+            <button onclick="dismissBanner()" class="bg-black/10 hover:bg-black/20 p-2 rounded-full transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+    </div>
+    {% endif %}
 
     <nav class="sticky top-0 z-40 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border-b dark:border-gray-800">
         <div class="max-w-2xl mx-auto px-4 py-3 flex justify-between items-center relative">
@@ -69,7 +90,14 @@
             </div>
             <nav class="space-y-6">
                 <a href="{{ url_for('public_home') }}" class="flex items-center gap-4 text-lg font-bold hover:text-skyBlue transition">🏠 Home</a>
-                <a href="{{ url_for('inbox') }}" class="flex items-center gap-4 text-lg font-bold hover:text-skyBlue transition">📩 Messages</a>
+
+                <a href="{{ url_for('inbox') }}" class="flex items-center justify-between text-lg font-bold hover:text-skyBlue transition">
+                    <span class="flex items-center gap-4">📩 Messages</span>
+                    {% if unread_count > 0 %}
+                    <span class="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full">{{ unread_count }}</span>
+                    {% endif %}
+                </a>
+
                 <a href="{{ url_for('dashboard') }}" class="flex items-center gap-4 text-lg font-bold hover:text-skyBlue transition">📊 Dashboard</a>
                 <a href="{{ url_for('profile_settings') }}" class="flex items-center gap-4 text-lg font-bold hover:text-skyBlue transition">⚙️ Settings</a>
                 <a href="{{ url_for('create_post') }}" class="flex items-center gap-4 text-lg font-bold hover:text-skyBlue transition">➕ New Post</a>
@@ -101,7 +129,7 @@
         <div class="divide-y dark:divide-gray-800">
             {% for post in posts %}
             <article class="p-4 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition relative">
-                
+
                 {% if user and user.username == post.author %}
                 <div class="absolute top-4 right-4 z-10">
                     <form action="{{ url_for('delete_post', post_id=post.id) }}" method="POST" onsubmit="return confirm('Sigurado ka i-delete ni, Aloy?');">
@@ -215,10 +243,18 @@
             <a href="{{ url_for('public_home') }}" class="{{ 'text-skyBlue' if active_tab in ['discover', 'following'] or not active_tab else 'text-gray-400' }}">
                 <svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.1L2 11h3v9h6v-5h2v5h6v-9h3L12 2.1z"/></svg>
             </a>
-            <a href="{{ url_for('inbox') }}" class="{{ 'text-skyBlue' if active_tab == 'messages' else 'text-gray-400' }}">
+
+            <a href="{{ url_for('inbox') }}" class="relative {{ 'text-skyBlue' if active_tab == 'messages' else 'text-gray-400' }}">
                 <svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+                {% if unread_count > 0 %}
+                <span class="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-900">
+                    {{ unread_count }}
+                </span>
+                {% endif %}
             </a>
+
             <a href="{{ url_for('create_post') }}" class="text-gray-400"><svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6-h2v-6H5v-2h6V5h2v6h6v2z"/></svg></a>
+
             <a href="{{ url_for('profile_settings') }}" class="w-7 h-7 rounded-full overflow-hidden border-2 {{ 'border-skyBlue' if active_tab == 'settings' else 'border-gray-300' }}">
                 <img src="{{ user.profile_pic if user and user.profile_pic else 'https://ui-avatars.com/api/?name=' + (user.username if user else 'Guest') }}" class="w-full h-full object-cover">
             </a>
@@ -226,6 +262,30 @@
     </div>
 
     <script>
+        // --- NEW POST NOTIFICATION SCRIPT ---
+        {% if has_new_post %}
+        window.addEventListener('load', () => {
+            const banner = document.getElementById('newPostAlert');
+            const alertSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3');
+            
+            setTimeout(() => {
+                banner.classList.add('show');
+                alertSound.volume = 0.2;
+                alertSound.play().catch(e => console.log("Sound ready"));
+                if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
+
+                // Auto-hide after 7 seconds
+                setTimeout(() => dismissBanner(), 7000);
+            }, 1500);
+        });
+
+        function dismissBanner() {
+            const banner = document.getElementById('newPostAlert');
+            if (banner) banner.classList.remove('show');
+        }
+        {% endif %}
+
+        // --- EXISTING SCRIPTS ---
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/sw.js').catch(err => console.log('PWA Error', err));

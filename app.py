@@ -54,10 +54,20 @@ class Post(db.Model):
     slug = db.Column(db.String(200), unique=True, nullable=False)
     author = db.Column(db.String(80), nullable=False)
     author_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    created_at = db.Column(db.DateTime, default=ph_time) # Gi-sync sa PH time
+    created_at = db.Column(db.DateTime, default=ph_time)
     approved = db.Column(db.Boolean, default=False)
     media_file = db.Column(db.String(500), nullable=True)
     media_type = db.Column(db.String(10), nullable=True)
+
+    # KINI ANG MU-FIX SA TANANG ERROR:
+    # 1. Inig delete sa Post, ma-delete sab ang tanang LIKES niini
+    likes = db.relationship('Like', backref='post', cascade="all, delete-orphan", lazy=True)
+    
+    # 2. Inig delete sa Post, ma-delete sab ang tanang COMMENTS niini
+    comments = db.relationship('Comment', backref='post', cascade="all, delete-orphan", lazy=True)
+    
+    # 3. Kung naa kay Notifications nga nakakonekta sa Post, i-add sab ni:
+    # notifications = db.relationship('Notification', backref='post', cascade="all, delete-orphan", lazy=True)
 
 class Reaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -102,6 +112,19 @@ class Message(db.Model):
     # 2. DUGANG: Relationship para makuha ang content sa gi-replyan
     parent_message = db.relationship('Message', remote_side=[id], backref='replies')
     reaction = db.Column(db.String(20), nullable=True)
+
+class Notification(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False) # Kinsa ang makadawat
+    sender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False) # Kinsa ang nag-trigger
+    post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=True) # Unsa nga post
+    notif_type = db.Column(db.String(20)) # 'like', 'comment', 'admin'
+    message = db.Column(db.String(255))
+    is_read = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=ph_time)
+
+    # Relationships para dali ra i-display ang pangalan sa sender
+    sender = db.relationship('User', foreign_keys=[sender_id])
 
 # --- 3. HELPERS & UTILITIES ---
 
@@ -206,6 +229,7 @@ def public_home():
     tab = request.args.get('tab', 'discover')
     user = db.session.get(User, session.get('user_id')) if 'user_id' in session else None
 
+    # 1. Main Post Filtering Logic
     if tab == 'video':
         posts = Post.query.filter_by(approved=True, media_type='video').order_by(Post.created_at.desc()).all()
     elif tab == 'following' and user:
@@ -213,8 +237,16 @@ def public_home():
         posts = Post.query.filter(Post.author_id.in_(followed_ids), Post.approved==True).order_by(Post.created_at.desc()).all()
     else:
         posts = Post.query.filter_by(approved=True).order_by(Post.created_at.desc()).all()
-    
-    return render_template('home_public.html', posts=posts, user=user, active_tab=tab)
+
+    # 2. Check for New Posts (Last 24 Hours) para sa Pop-up
+    time_threshold = datetime.utcnow() - timedelta(hours=24)
+    has_new_post = Post.query.filter(Post.approved==True, Post.created_at >= time_threshold).first() is not None
+
+    return render_template('home_public.html', 
+                           posts=posts, 
+                           user=user, 
+                           active_tab=tab, 
+                           has_new_post=has_new_post)
 
 @app.route('/change-password', methods=['GET', 'POST'])
 @login_required
@@ -272,8 +304,19 @@ def login():
 @login_required
 def dashboard():
     user = db.session.get(User, session['user_id'])
+    
+    # Imong existing logic sa posts
     posts = Post.query.all() if user.is_admin else Post.query.filter_by(author=user.username).all()
-    return render_template('my_dashboard.html', posts=posts, user=user)
+    
+    # KINI ANG GI-DUGANG:
+    # 0 lang sa atong sugod aron dili mo-error ang Bell icon sa HTML
+    notification_count = 0 
+    
+    # Gi-pass na nato ang notification_count sa render_template
+    return render_template('my_dashboard.html', 
+                           posts=posts, 
+                           user=user, 
+                           notification_count=notification_count)
 
 @app.route('/create', methods=['GET', 'POST'])
 @login_required
@@ -405,7 +448,10 @@ def user_profile(username):
 def like_post(post_id):
     if 'user_id' not in session: return {"error": "Unauthorized"}, 401
     user_id = session['user_id']
+    post = Post.query.get_or_404(post_id)
+
     existing_like = Like.query.filter_by(user_id=user_id, post_id=post_id).first()
+
     if existing_like:
         db.session.delete(existing_like)
         db.session.commit()
@@ -413,19 +459,50 @@ def like_post(post_id):
     else:
         new_like = Like(user_id=user_id, post_id=post_id)
         db.session.add(new_like)
+
+        # Notification Logic
+        if post.author_id != user_id:
+            new_notif = Notification(
+                user_id=post.author_id,
+                sender_id=user_id,
+                post_id=post.id,
+                notif_type='like',
+                message=f"liked your post: {post.title[:30]}..."
+            )
+            db.session.add(new_notif)
+
         db.session.commit()
         return {"liked": True, "count": Like.query.filter_by(post_id=post_id).count()}
 
 @app.route('/comment/<int:post_id>', methods=['POST'])
 def add_comment(post_id):
     if 'user_id' not in session: return {"error": "Unauthorized"}, 401
+    
     user = db.session.get(User, session['user_id'])
+    post = Post.query.get_or_404(post_id)
+    
     data = request.get_json()
     content = data.get('content', '').strip()
     if not content: return {"error": "Empty comment"}, 400
+
+    # 1. Save ang comment
     new_comment = Comment(post_id=post_id, user_id=user.id, content=content)
     db.session.add(new_comment)
+
+    # 2. Notification Logic (Gi-fix nako ang spacing ani)
+    if post.author_id != user.id:
+        new_notif = Notification(
+            user_id=post.author_id,
+            sender_id=user.id,
+            post_id=post.id,
+            notif_type='comment',
+            message=f"commented on your post: \"{content[:30]}...\""
+        )
+        db.session.add(new_notif)
+    
+    # 3. Commit tanan
     db.session.commit()
+
     formatted_time = new_comment.created_at.strftime('%b %d, %I:%M %p')
     return {
         "success": True,
@@ -594,7 +671,24 @@ def react_message(message_id):
         db.session.rollback()
         return {"status": "error"}, 500
 
+@app.route('/notifications')
+@login_required
+def notifications():
+    user = db.session.get(User, session['user_id'])
+    notification_count = 0
+    return render_template('notifications.html', user=user, notification_count=notification_count)
 
+@app.route('/api/unread-count')
+def unread_count():
+    # I-check kung naay naka-login sa session
+    if 'user_id' not in session:
+        return {"count": 0}
+    
+    user_id = session['user_id']
+    
+    # Gamita ang user_id gikan sa session para sa query
+    count = Notification.query.filter_by(user_id=user_id, is_read=False).count()
+    return {"count": count}
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5000)
