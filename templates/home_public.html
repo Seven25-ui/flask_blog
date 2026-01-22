@@ -32,9 +32,36 @@
         /* New Post Banner Animation */
         #newPostAlert.show { transform: translate(-50%, 0); opacity: 1; }
         #newPostAlert { transform: translate(-50%, -200%); transition: all 0.7s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+
+    /* I-add ni sa imong existing styles */
+    @keyframes loading {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(250%); }
+    }
     </style>
 </head>
 <body class="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
+
+<body class="bg-gray-100 dark:bg-gray-950">
+    <div id="global-loader" class="fixed inset-0 z-[100] bg-white dark:bg-[#0b0e11] flex flex-col items-center justify-center transition-opacity duration-700">
+        <div class="text-center">
+            <div class="relative inline-block mb-8">
+                <h1 class="text-7xl font-black text-blue-600 tracking-tighter animate-bounce">
+                    SE<span class="text-gray-900 dark:text-white">7</span>EN
+                </h1>
+                <div class="absolute -top-6 -right-8 text-4xl animate-spin" style="animation-duration: 3s;">🚀</div>
+            </div>
+            <div class="h-8">
+                <p id="funny-text" class="text-sm font-medium text-gray-500 dark:text-gray-400 italic">Waking up the server... 😴</p>
+            </div>
+            <div class="w-48 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full mt-6 overflow-hidden">
+                <div class="h-full bg-blue-600 animate-[loading_2s_ease-in-out_infinite]" style="width: 30%;"></div>
+            </div>
+        </div>
+    </div>
+
+    <nav>...</nav> 
+    <main>...</main>
 
     {% if has_new_post %}
     <div id="newPostAlert" class="fixed top-5 left-1/2 z-[100] w-[92%] max-w-sm opacity-0 pointer-events-none">
@@ -398,6 +425,42 @@
                 navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW Error', err));
             });
         }
+
+        const messages = [
+            "Waking up the server... 😴",
+            "Feeding the database hamsters... 🐹",
+            "Polishing the pixels... ✨",
+            "Connecting to Singapore (paspas ni!)... 🇸🇬",
+            "Almost there, don't leave me! 🥺"
+        ];
+        
+        let msgIndex = 0;
+        const msgElement = document.getElementById('funny-text');
+        
+        const msgInterval = setInterval(() => {
+            if(msgElement) {
+                msgIndex = (msgIndex + 1) % messages.length;
+                msgElement.innerText = messages[msgIndex];
+            }
+        }, 1500);
+
+        window.addEventListener('load', () => {
+            const loader = document.getElementById('global-loader');
+            setTimeout(() => {
+                clearInterval(msgInterval);
+                if(msgElement) msgElement.innerText = "Ready na! Let's go! 🚀";
+                
+                setTimeout(() => {
+                    loader.style.opacity = '0';
+                    setTimeout(() => {
+                        loader.style.display = 'none';
+                    }, 700);
+                }, 500);
+            }, 1000);
+        });
+    </script>
+</body>
+
     </script>
 </body>
 </html>
