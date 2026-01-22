@@ -305,18 +305,27 @@ def login():
 @login_required
 def dashboard():
     user = db.session.get(User, session['user_id'])
-    
-    # Imong existing logic sa posts
-    posts = Post.query.all() if user.is_admin else Post.query.filter_by(author=user.username).all()
-    
-    # KINI ANG GI-DUGANG:
-    # 0 lang sa atong sugod aron dili mo-error ang Bell icon sa HTML
-    notification_count = 0 
-    
-    # Gi-pass na nato ang notification_count sa render_template
+
+    # 1. LOGIC PARA SA MASTER ADMIN
+    # Gi-usab gikan sa 'Aloy' ngadto sa 'admin'
+    if user.username == 'admin':
+        all_users = User.query.all()
+        
+        # FIX: Gi-usab ang 'timestamp' ngadto sa 'created_at' para mawala ang AttributeError
+        all_messages = Message.query.order_by(Message.created_at.desc()).all()
+
+        return render_template('admin.html',
+                               users=all_users,
+                               messages=all_messages, # Match na ni sa imong admin.html
+                               user=user)
+
+    # 2. LOGIC PARA SA NORMAL USERS
+    posts = Post.query.filter_by(author=user.username).all()
+    notification_count = 0
+
     return render_template('my_dashboard.html', 
                            posts=posts, 
-                           user=user, 
+                           user=user,
                            notification_count=notification_count)
 
 @app.route('/create', methods=['GET', 'POST'])
@@ -758,6 +767,61 @@ def delete_message(message_id):
         return redirect(request.referrer or url_for('inbox'))
     else:
         return "Dili nimo mahimong papason kini.", 403
+
+@app.route('/admin/delete_user/<int:user_id>')
+def admin_delete_user(user_id):
+    # Gigamit ang db.session.get() para mawala ang LegacyAPIWarning
+    current_admin = db.session.get(User, session.get('user_id'))
+    
+    if current_admin and current_admin.username == 'admin':
+        user_to_delete = db.session.get(User, user_id)
+        
+        if not user_to_delete:
+            return "User not found", 404
+            
+        try:
+            # 1. I-delete ang messages
+            Message.query.filter_by(sender_id=user_id).delete()
+            
+            # 2. I-delete ang posts (Gigamit ang 'Post' diretso kay naa ra ni sa app.py)
+            # Kung ang imong Post model naay field nga 'author', kani gamita:
+            Post.query.filter_by(author=user_to_delete.username).delete()
+            
+            # 3. I-delete ang User mismo
+            db.session.delete(user_to_delete)
+            db.session.commit()
+            print(f"SUCCESS: User {user_to_delete.username} deleted!")
+            
+        except Exception as e:
+            db.session.rollback()
+            print(f"DATABASE ERROR: {str(e)}")
+            return f"Error: {str(e)}", 500
+            
+    return redirect(url_for('dashboard'))
+# Route para sa Delete Message (Admin Only)
+@app.route('/admin/delete_message/<int:msg_id>')
+def admin_delete_message(msg_id):
+    # I-check kung ikaw ba ang naka-login isip 'admin'
+    current_admin = db.session.get(User, session.get('user_id'))
+    
+    if current_admin and current_admin.username == 'admin':
+        # Pangitaon ang message sa database gamit ang ID
+        msg = db.session.get(Message, msg_id)
+        
+        if msg:
+            try:
+                db.session.delete(msg)
+                db.session.commit()
+                print(f"SUCCESS: Message ID {msg_id} deleted!")
+            except Exception as e:
+                db.session.rollback()
+                print(f"DATABASE ERROR: {str(e)}")
+                return f"Error: {str(e)}", 500
+        else:
+            return "Message not found", 404
+            
+    # I-redirect balik sa dashboard human sa pag-delete
+    return redirect(url_for('dashboard'))
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5000)
