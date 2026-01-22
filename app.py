@@ -742,5 +742,22 @@ def chat(sender_id):
     
     # ... return render_template ...
 
+@app.route('/delete_message/<int:message_id>', methods=['GET', 'POST'])
+def delete_message(message_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    # Pangitaon ang message sa Neon DB
+    message = Message.query.get_or_404(message_id)
+    
+    # Siguroha nga ang sender ang nag-delete (sender_id base sa imong model)
+    if message.sender_id == session['user_id']:
+        db.session.delete(message)
+        db.session.commit()
+        print(f"Message {message_id} deleted successfully!") # Para makita nimo sa Termux log
+        return redirect(request.referrer or url_for('inbox'))
+    else:
+        return "Dili nimo mahimong papason kini.", 403
+
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5000)
