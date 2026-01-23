@@ -1,102 +1,126 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SE7EN | Master Admin</title>
+    <title>SE7EN • Central Command</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
     <style>
-        @keyframes loading { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
+        body { 
+            background-color: #000000; 
+            color: #f1f5f9; 
+            font-family: 'Inter', sans-serif;
+            background-image: radial-gradient(circle at top right, #0ea5e908, transparent 600px);
+        }
+        .brand-font { font-family: 'Orbitron', sans-serif; }
         .hide-scroll::-webkit-scrollbar { display: none; }
-        .verified-badge { color: #1d9bf0; font-size: 0.85em; margin-left: 4px; vertical-align: middle; }
+        .glass-card {
+            background: rgba(10, 10, 10, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid #1f2937;
+        }
+        .status-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
     </style>
 </head>
-<body class="bg-gray-50 dark:bg-[#0b0e11] text-gray-800 dark:text-gray-200 font-sans">
+<body class="min-h-screen">
 
-    <nav class="bg-white dark:bg-[#15191c] border-b border-gray-200 dark:border-gray-800 p-4 sticky top-0 z-50">
+    <nav class="glass-card border-x-0 border-t-0 sticky top-0 z-50 px-6 py-4">
         <div class="max-w-7xl mx-auto flex justify-between items-center">
-            <div class="flex items-center gap-2">
-                <span class="text-2xl font-black text-blue-600 tracking-tighter italic">SE7EN</span>
-                <span class="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-sm">MASTER ADMIN</span>
-            </div>
             <div class="flex items-center gap-4">
-                <a href="{{ url_for('inbox') }}" class="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-lg text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-blue-600 hover:text-white transition">
-                    <i class="fa-solid fa-house-user"></i>
-                    <span>Back to Chat</span>
+                <span class="brand-font text-2xl font-black text-sky-500 tracking-tighter italic">SE7EN</span>
+                <span class="bg-red-500/10 border border-red-500/20 text-red-500 text-[10px] font-black px-3 py-1 rounded-full tracking-[0.2em]">MASTER ADMIN</span>
+            </div>
+            <div class="flex items-center gap-3">
+                <a href="{{ url_for('inbox') }}" class="flex items-center gap-2 bg-sky-500 hover:bg-sky-400 px-5 py-2 rounded-xl text-xs font-black text-white transition-all transform active:scale-95 uppercase tracking-widest shadow-lg shadow-sky-500/20">
+                    <i class="fa-solid fa- terminal mr-1"></i> Return to System
                 </a>
             </div>
         </div>
     </nav>
 
-    <main class="max-w-7xl mx-auto p-4 md:p-8">
+    <main class="max-w-7xl mx-auto p-6 lg:p-10 space-y-10">
 
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 text-center">
-            <div class="bg-white dark:bg-[#15191c] p-4 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
-                <p class="text-[10px] text-gray-400 uppercase font-black tracking-widest">Total Users</p>
-                <h3 class="text-3xl font-black mt-1 text-blue-600">{{ users|length }}</h3>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <div class="glass-card p-6 rounded-[2rem] hover:border-sky-500/50 transition-colors">
+                <p class="text-[10px] text-gray-500 uppercase font-black tracking-[0.2em]">Nodes Active</p>
+                <h3 class="text-4xl font-black mt-2 text-white">{{ users|length }}</h3>
             </div>
-            <div class="bg-white dark:bg-[#15191c] p-4 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
-                <p class="text-[10px] text-gray-400 uppercase font-black tracking-widest">Messages</p>
-                <h3 class="text-3xl font-black mt-1 text-purple-600">{{ messages|length }}</h3>
+            <div class="glass-card p-6 rounded-[2rem] hover:border-purple-500/50 transition-colors">
+                <p class="text-[10px] text-gray-500 uppercase font-black tracking-[0.2em]">Data Packets</p>
+                <h3 class="text-4xl font-black mt-2 text-white">{{ messages|length }}</h3>
             </div>
-            <div class="bg-white dark:bg-[#15191c] p-4 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
-                <p class="text-[10px] text-gray-400 uppercase font-black tracking-widest">Server</p>
-                <h3 class="text-[10px] font-black mt-3 text-green-500 animate-pulse"><i class="fa-solid fa-circle text-[6px] mr-1"></i> SINGAPORE LIVE</h3>
+            <div class="glass-card p-6 rounded-[2rem]">
+                <p class="text-[10px] text-gray-500 uppercase font-black tracking-[0.2em]">Uptime Status</p>
+                <div class="flex items-center gap-2 mt-4 text-green-500">
+                    <div class="h-2 w-2 rounded-full bg-green-500 status-pulse"></div>
+                    <span class="text-[11px] font-black tracking-widest uppercase">Singapore-1 Online</span>
+                </div>
             </div>
-            <div class="bg-white dark:bg-[#15191c] p-4 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
-                <p class="text-[10px] text-gray-400 uppercase font-black tracking-widest">Database</p>
-                <h3 class="text-[10px] font-black mt-3 text-blue-400">NEON DB</h3>
+            <div class="glass-card p-6 rounded-[2rem]">
+                <p class="text-[10px] text-gray-500 uppercase font-black tracking-[0.2em]">Core DB</p>
+                <h3 class="text-[11px] font-black mt-4 text-sky-400 tracking-widest uppercase underline underline-offset-4 decoration-2">Neon Instance</h3>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
+            
             <div class="lg:col-span-2 space-y-6">
-                <div class="bg-white dark:bg-[#15191c] rounded-2xl border border-gray-100 dark:border-gray-800 shadow-md overflow-hidden">
-                    <div class="p-6 border-b border-gray-100 dark:border-gray-800">
-                        <h2 class="text-xl font-black mb-4 flex items-center gap-2">
-                            <i class="fa-solid fa-users-gear text-blue-600"></i> User Management
+                <div class="glass-card rounded-[2.5rem] overflow-hidden">
+                    <div class="p-8 border-b border-gray-900 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <h2 class="brand-font text-lg font-black flex items-center gap-3">
+                            <i class="fa-solid fa-users-viewfinder text-sky-500"></i> Entity Database
                         </h2>
-                        <div class="relative">
-                            <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                            <input type="text" id="userSearch" placeholder="Search users..."
-                                class="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-gray-900 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 transition">
+                        <div class="relative max-w-xs w-full">
+                            <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-600 text-xs"></i>
+                            <input type="text" id="userSearch" placeholder="Filter identities..." 
+                                   class="w-full pl-10 pr-4 py-3 bg-black border border-gray-800 rounded-2xl text-[11px] font-bold focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all outline-none">
                         </div>
                     </div>
 
                     <div class="overflow-x-auto">
-                        <table class="w-full text-left text-sm" id="userTable">
-                            <thead class="bg-gray-50 dark:bg-gray-900 text-[10px] uppercase font-bold text-gray-400 tracking-widest">
+                        <table class="w-full text-left" id="userTable">
+                            <thead class="bg-gray-900/30 text-[10px] uppercase font-black text-gray-500 tracking-[0.2em]">
                                 <tr>
-                                    <th class="px-6 py-4">Identity</th>
-                                    <th class="px-6 py-4">Status</th>
-                                    <th class="px-6 py-4 text-right">Control</th>
+                                    <th class="px-8 py-5">Identity Profile</th>
+                                    <th class="px-8 py-5">Access Level</th>
+                                    <th class="px-8 py-5 text-right">Termination</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                            <tbody class="divide-y divide-gray-900">
                                 {% for user in users %}
-                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition user-row">
-                                    <td class="px-6 py-4">
-                                        <div class="flex items-center">
-                                            <span class="font-black text-gray-900 dark:text-white">{{ user.username }}</span>
-                                            {% if user.username == 'admin' %}
-                                                <i class="fa-solid fa-circle-check verified-badge" title="Owner Verified"></i>
-                                            {% endif %}
+                                <tr class="hover:bg-sky-500/[0.02] transition user-row">
+                                    <td class="px-8 py-6">
+                                        <div class="flex items-center gap-3">
+                                            <div class="h-8 w-8 rounded-full bg-gray-800 flex items-center justify-center text-[10px] font-black text-sky-500">
+                                                {{ user.username[:2]|upper }}
+                                            </div>
+                                            <div>
+                                                <div class="flex items-center gap-2">
+                                                    <span class="font-bold text-white text-sm tracking-tight">{{ user.username }}</span>
+                                                    {% if user.username == 'admin' %}
+                                                        <i class="fa-solid fa-shield-check text-sky-500 text-[10px]" title="Root Admin"></i>
+                                                    {% endif %}
+                                                </div>
+                                                <div class="text-[10px] text-gray-600 font-bold uppercase tracking-tighter">{{ user.email }}</div>
+                                            </div>
                                         </div>
-                                        <div class="text-[11px] text-gray-500">{{ user.email }}</div>
                                     </td>
-                                    <td class="px-6 py-4">
+                                    <td class="px-8 py-6">
                                         {% if user.username == 'admin' %}
-                                            <span class="px-2 py-0.5 bg-blue-500 text-white text-[9px] font-black rounded italic">OWNER</span>
+                                            <span class="px-3 py-1 bg-sky-500/10 text-sky-500 text-[9px] font-black rounded-lg border border-sky-500/20 tracking-widest uppercase italic">ROOT</span>
                                         {% else %}
-                                            <span class="px-2 py-0.5 bg-green-100 text-green-600 text-[9px] font-bold rounded">ACTIVE</span>
+                                            <span class="px-3 py-1 bg-green-500/10 text-green-500 text-[9px] font-black rounded-lg border border-green-500/20 tracking-widest uppercase">ACTIVE_NODE</span>
                                         {% endif %}
                                     </td>
-                                    <td class="px-6 py-4 text-right">
-                                        <button onclick="confirmDelete('{{ user.id }}', '{{ user.username }}')"
-                                                class="h-8 w-8 bg-red-100 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition">
-                                            <i class="fa-solid fa-trash-can text-xs"></i>
+                                    <td class="px-8 py-6 text-right">
+                                        <button onclick="confirmDelete('{{ user.id }}', '{{ user.username }}')" 
+                                                class="h-9 w-9 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all transform active:scale-90 flex items-center justify-center ml-auto border border-red-500/20">
+                                            <i class="fa-solid fa-bolt-lightning text-xs"></i>
                                         </button>
                                     </td>
                                 </tr>
@@ -107,44 +131,40 @@
                 </div>
             </div>
 
-            <div class="bg-white dark:bg-[#15191c] rounded-2xl border border-gray-100 dark:border-gray-800 shadow-md flex flex-col h-[700px]">
-                <div class="p-6 border-b border-gray-100 dark:border-gray-800">
-                    <h2 class="text-xl font-black mb-4 flex items-center gap-2 text-purple-600">
-                        <i class="fa-solid fa-database"></i> Live Feed
+            <div class="glass-card rounded-[2.5rem] flex flex-col h-[750px]">
+                <div class="p-8 border-b border-gray-900">
+                    <h2 class="brand-font text-lg font-black flex items-center gap-3 text-purple-500 uppercase tracking-tighter">
+                        <i class="fa-solid fa-satellite-dish"></i> Live Stream
                     </h2>
-                    <input type="text" id="msgSearch" placeholder="Search message content..."
-                                class="w-full px-4 py-2 bg-gray-50 dark:bg-gray-900 border-none rounded-xl text-xs focus:ring-2 focus:ring-purple-500 transition">
+                    <input type="text" id="msgSearch" placeholder="Scan traffic content..."
+                                class="w-full mt-6 px-4 py-3 bg-black border border-gray-800 rounded-2xl text-[11px] font-bold focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all outline-none">
                 </div>
-
-                <div class="flex-1 overflow-y-auto p-4 space-y-4 hide-scroll" id="messageList">
+                
+                <div class="flex-1 overflow-y-auto p-6 space-y-4 hide-scroll" id="messageList">
                     {% for msg in messages %}
-                    <div class="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-transparent hover:border-purple-500/30 transition group msg-item">
-                        <div class="flex justify-between items-start mb-2">
+                    <div class="p-5 bg-gray-900/20 rounded-2xl border border-gray-900 hover:border-purple-500/30 transition group msg-item relative overflow-hidden">
+                        <div class="flex justify-between items-start mb-3">
                             <div>
-                                <span class="text-[10px] font-black text-blue-500 uppercase flex items-center">
+                                <span class="text-[10px] font-black text-sky-500 uppercase tracking-[0.1em]">
                                     {{ msg.sender.username }}
-                                    {% if msg.sender.username == 'admin' %}
-                                        <i class="fa-solid fa-circle-check ml-1 text-[8px]"></i>
-                                    {% endif %}
                                 </span>
-                                <div class="text-[9px] text-gray-400">{{ msg.timestamp }}</div>
+                                <div class="text-[9px] text-gray-700 font-bold uppercase mt-1 tracking-tighter">{{ msg.timestamp }}</div>
                             </div>
-                            <button onclick="confirmDeleteMessage('{{ msg.id }}')"
-                                class="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition p-1">
+                            <button onclick="confirmDeleteMessage('{{ msg.id }}')" 
+                                    class="opacity-0 group-hover:opacity-100 text-red-500/60 hover:text-red-500 transition-all p-2 bg-red-500/5 rounded-lg">
                                 <i class="fa-solid fa-trash-can text-[10px]"></i>
                             </button>
                         </div>
-                        <p class="text-xs text-gray-700 dark:text-gray-300 break-words msg-content font-medium">"{{ msg.content }}"</p>
+                        <p class="text-xs text-gray-400 leading-relaxed msg-content font-medium italic">"{{ msg.content }}"</p>
                     </div>
                     {% endfor %}
                 </div>
             </div>
-
         </div>
     </main>
 
     <script>
-        // User Search Logic
+        // Real-time Identity Search
         document.getElementById('userSearch').addEventListener('keyup', function() {
             let filter = this.value.toLowerCase();
             document.querySelectorAll('.user-row').forEach(row => {
@@ -152,7 +172,7 @@
             });
         });
 
-        // Message Filter Logic
+        // Data Packet Scrubber (Message Search)
         document.getElementById('msgSearch').addEventListener('keyup', function() {
             let filter = this.value.toLowerCase();
             document.querySelectorAll('.msg-item').forEach(item => {
@@ -161,20 +181,19 @@
             });
         });
 
-        // User Delete Confirm
+        // Destruction Protocols
         function confirmDelete(userId, username) {
             if (username === 'admin') {
-                alert("Boss Aloy, dili nimo pwede i-delete ang imong Master Account! 👑");
+                alert("👑 NEGATIVE: Master Aloy, your root access cannot be terminated.");
                 return;
             }
-            if (confirm(`⚠️ PERMANENT DELETE: Sigurado ka nga papason si "${username}"?`)) {
+            if (confirm(`🚨 WARNING: Are you sure you want to purge identity "${username}" from the database?`)) {
                 window.location.href = `/admin/delete_user/${userId}`;
             }
         }
 
-        // Message Delete Confirm
         function confirmDeleteMessage(msgId) {
-            if (confirm(`Papason kining message gikan sa database?`)) {
+            if (confirm(`🚨 Scrubber: Permanent removal of this data packet?`)) {
                 window.location.href = `/admin/delete_message/${msgId}`;
             }
         }

@@ -1,143 +1,153 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ target_user.username }} (@{{ target_user.username }})</title>
+    <title>{{ target_user.username }} (@{{ target_user.username }}) • SE7EN</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: { extend: { colors: { skyBlue: '#0085ff' } } }
-        };
-        if (localStorage.getItem('darkMode') === 'true') {
-            document.documentElement.classList.add('dark');
-        }
-    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Orbitron:wght@900&display=swap" rel="stylesheet">
+
     <style>
-        .comment-enter { animation: slideIn 0.3s ease-out; }
+        :root { --bg-deep: #000000; --sky-accent: #0ea5e9; }
+        body { background-color: var(--bg-deep); color: #f1f5f9; font-family: 'Inter', sans-serif; }
+
+        .brand-font { font-family: 'Orbitron', sans-serif; letter-spacing: 0.15em; }
+        .text-brand-gradient { background: linear-gradient(45deg, #0ea5e9, #60a5fa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .banner-gradient { background: linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.8)); }
+
         @keyframes slideIn {
-            from { opacity: 0; transform: translateX(-10px); }
-            to { opacity: 1; transform: translateX(0); }
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-        .banner-gradient {
-            background: linear-gradient(to bottom, transparent 60%, rgba(0,0,0,0.3));
-        }
+        .animate-feed { animation: slideIn 0.4s ease-out forwards; }
     </style>
 </head>
-<body class="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors">
+<body class="selection:bg-sky-500/30">
 
-    <main class="max-w-2xl mx-auto min-h-screen border-x dark:border-gray-800 pb-20">
-        <div class="sticky top-0 z-30 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md p-4 flex items-center gap-6 border-b dark:border-gray-800">
-            <a href="javascript:history.back()" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+    <main class="max-w-2xl mx-auto min-h-screen border-x border-gray-800 pb-20 bg-black">
+
+        <div class="sticky top-0 z-40 bg-black/80 backdrop-blur-xl p-4 flex items-center gap-6 border-b border-gray-800">
+            <a href="javascript:history.back()" class="p-2 hover:bg-gray-800 rounded-full transition-all active:scale-90">
+                <svg class="w-6 h-6 text-sky-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
             </a>
             <div>
-                <h2 class="font-black text-xl leading-none">{{ target_user.username }}</h2>
-                <span class="text-sm text-gray-500">{{ posts|length }} posts</span>
+                <h2 class="font-black text-lg leading-none tracking-tight">{{ target_user.username }}</h2>
+                <span class="text-[10px] font-black uppercase tracking-widest text-gray-500">{{ posts|length }} Stories</span>
             </div>
         </div>
 
         <div class="relative">
-            <div class="h-40 w-full bg-gray-200 dark:bg-gray-800 relative overflow-hidden">
+            <div class="h-44 w-full bg-gray-900 relative overflow-hidden">
                 {% if target_user.background_pic %}
                     <img src="{{ target_user.background_pic }}" class="w-full h-full object-cover">
                     <div class="absolute inset-0 banner-gradient"></div>
                 {% else %}
-                    <div class="w-full h-full bg-skyBlue/20"></div>
+                    <div class="w-full h-full bg-gradient-to-br from-sky-900/40 to-black"></div>
                 {% endif %}
             </div>
 
             <div class="px-4">
-                <div class="flex justify-between items-end -mt-12 mb-4 relative z-10">
-                    <img src="{{ target_user.profile_pic if target_user.profile_pic else 'https://ui-avatars.com/api/?name=' + target_user.username }}"
-                         class="w-28 h-28 rounded-full border-4 border-white dark:border-gray-900 object-cover shadow-md">
+                <div class="flex justify-between items-end -mt-14 mb-4 relative z-10">
+                    <div class="relative group">
+                        <div class="absolute -inset-1 bg-sky-500 rounded-full opacity-30 blur group-hover:opacity-60 transition"></div>
+                        <img src="{{ target_user.profile_pic if target_user.profile_pic else 'https://ui-avatars.com/api/?name=' + target_user.username }}"
+                             class="relative w-28 h-28 rounded-full border-4 border-black object-cover shadow-2xl">
+                    </div>
 
-                    <div id="follow-section" class="flex gap-2 items-center">
-                        {% if user and user.id == target_user.id %}
-                            <a href="{{ url_for('profile_settings') }}" class="px-4 py-2 bg-white dark:bg-gray-900 border dark:border-gray-700 rounded-full font-bold text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition shadow-sm">Edit Profile</a>
-                        {% elif user %}
-                            <a href="{{ url_for('inbox', user_id=target_user.id) }}" 
-                               class="p-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition shadow-sm"
-                               title="Message">
-                               <svg class="w-6 h-6 text-skyBlue" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
-                            </a>
-
-                            {% if is_following(user.id, target_user.id) %}
-                                <button onclick="handleFollow({{ target_user.id }})" id="follow-btn"
-                                    class="px-6 py-2 border border-gray-300 dark:border-gray-700 rounded-full font-bold text-sm hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition group bg-white dark:bg-gray-900">
-                                    <span class="group-hover:hidden">Following</span>
-                                    <span class="hidden group-hover:inline">Unfollow</span>
-                                </button>
+                    <div id="follow-section" class="flex gap-2 items-center pb-2">
+                        {% if user %}
+                            {% if user.id == target_user.id %}
+                                <a href="{{ url_for('profile_settings') }}" class="px-5 py-2.5 bg-white text-black rounded-full font-black text-[10px] uppercase tracking-widest hover:bg-sky-400 hover:text-white transition-all shadow-lg">Edit Profile</a>
                             {% else %}
-                                <button onclick="handleFollow({{ target_user.id }})" id="follow-btn"
-                                    class="px-6 py-2 bg-skyBlue text-white rounded-full font-bold text-sm hover:opacity-90 transition shadow-sm">
-                                    Follow
-                                </button>
+                                <a href="{{ url_for('inbox', user_id=target_user.id) }}"
+                                   class="p-2.5 bg-gray-900 text-sky-500 border border-gray-800 rounded-full hover:bg-sky-500 hover:text-white transition-all shadow-sm group"
+                                   title="Message {{ target_user.username }}">
+                                   <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                                   </svg>
+                                </a>
+
+                                {% if is_following(user.id, target_user.id) %}
+                                    <button onclick="handleFollow({{ target_user.id }})" id="follow-btn"
+                                        class="px-6 py-2.5 border border-gray-700 rounded-full font-black text-[10px] uppercase tracking-widest hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/50 transition group bg-black">
+                                        <span class="group-hover:hidden">Following</span>
+                                        <span class="hidden group-hover:inline">Unfollow</span>
+                                    </button>
+                                {% else %}
+                                    <button onclick="handleFollow({{ target_user.id }})" id="follow-btn"
+                                        class="px-6 py-2.5 bg-sky-500 text-white rounded-full font-black text-[10px] uppercase tracking-widest hover:bg-sky-400 transition shadow-lg shadow-sky-500/20">
+                                        Follow
+                                    </button>
+                                {% endif %}
                             {% endif %}
                         {% else %}
-                            <a href="{{ url_for('login') }}" class="px-6 py-2 bg-skyBlue text-white rounded-full font-bold text-sm shadow-sm">Follow</a>
+                            <a href="{{ url_for('login') }}" class="px-6 py-2.5 bg-sky-500 text-white rounded-full font-black text-[10px] uppercase tracking-widest shadow-lg">Follow</a>
                         {% endif %}
                     </div>
                 </div>
 
                 <div class="space-y-1">
-                    <h1 class="text-2xl font-black tracking-tight">{{ target_user.username }}</h1>
-                    <p class="text-gray-500">@{{ target_user.username }}</p>
+                    <h1 class="text-2xl font-black tracking-tighter flex items-center gap-2">
+                        {{ target_user.username }}
+                        <span class="text-sky-500 text-sm">●</span>
+                    </h1>
+                    <p class="text-gray-500 font-bold text-sm">@{{ target_user.username }}</p>
                 </div>
 
-                <div class="mt-4 text-[1rem] leading-relaxed">
-                    {{ target_user.bio if target_user.bio else "Wala pa'y bio kini nga user." }}
+                <div class="mt-4 text-sm leading-relaxed text-gray-300 max-w-lg">
+                    {{ target_user.bio if target_user.bio else "This user prefers to keep their story a mystery." }}
                 </div>
 
-                <div class="flex gap-4 mt-4 text-sm">
-                    <span class="text-gray-500"><strong class="text-gray-900 dark:text-white">0</strong> Following</span>
-                    <span class="text-gray-500"><strong id="follower-count" class="text-gray-900 dark:text-white">{{ get_follower_count(target_user.id) }}</strong> Followers</span>
+                <div class="flex gap-6 mt-5 text-xs font-bold uppercase tracking-widest border-b border-gray-900 pb-6">
+                    <span class="text-gray-500"><strong class="text-white">0</strong> Following</span>
+                    <span class="text-gray-500"><strong id="follower-count" class="text-white">{{ get_follower_count(target_user.id) }}</strong> Followers</span>
                 </div>
             </div>
         </div>
 
-        <div class="mt-6 border-t dark:border-gray-800 divide-y dark:divide-gray-800">
+        <div class="mt-2 divide-y divide-gray-900">
             {% for post in posts %}
-            <article class="p-4 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition">
+            <article class="p-4 sm:p-6 hover:bg-gray-900/30 transition group animate-feed">
                 <a href="{{ url_for('view_post', slug=post.slug) }}" class="block">
-                    <h3 class="font-bold text-lg mb-1 leading-tight">{{ post.title }}</h3>
-                    <p class="text-gray-600 dark:text-gray-300 line-clamp-3 mb-3 text-[0.95rem]">{{ post.content | striptags }}</p>
+                    <h3 class="font-black text-xl mb-2 leading-tight group-hover:text-sky-400 transition">{{ post.title }}</h3>
+                    <p class="text-gray-400 line-clamp-2 mb-4 text-sm leading-relaxed">{{ post.content | striptags }}</p>
                 </a>
 
                 {% if post.media_file %}
-                <div class="rounded-xl overflow-hidden border dark:border-gray-700 mb-3 bg-black">
+                <div class="rounded-2xl overflow-hidden border border-gray-800 mb-4 bg-neutral-950">
                     {% if post.media_type == 'video' %}
-                        <video src="{{ post.media_file }}" controls class="w-full max-h-80 object-contain opacity-90"></video>
+                        <video src="{{ post.media_file }}" class="w-full max-h-80 object-contain" controls></video>
                     {% else %}
-                        <img src="{{ post.media_file }}" class="w-full max-h-80 object-cover opacity-90">
+                        <img src="{{ post.media_file }}" class="w-full max-h-80 object-cover hover:scale-105 transition-transform duration-700">
                     {% endif %}
                 </div>
                 {% endif %}
 
-                <div class="flex justify-between max-w-sm text-gray-500 text-sm">
-                    <button onclick="toggleComments('{{ post.id }}')" class="hover:text-skyBlue transition flex items-center gap-1.5 group">
-                        <span class="p-2 group-hover:bg-skyBlue/10 rounded-full">💬</span>
-                        <span id="comment-count-{{ post.id }}">{{ get_comment_count(post.id) }}</span>
+                <div class="flex items-center gap-6 text-gray-500">
+                    <button class="hover:text-sky-400 transition flex items-center gap-2 font-black text-[10px] tracking-widest uppercase">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                        <span>{{ get_comment_count(post.id) }}</span>
                     </button>
+
                     <button onclick="handleLike({{ post.id }})" id="like-btn-{{ post.id }}"
-                            class="transition flex items-center gap-1.5 group {{ 'text-pink-500' if user and user_has_liked(user.id, post.id) else 'hover:text-pink-500' }}">
-                        <span class="p-2 group-hover:bg-pink-500/10 rounded-full text-lg" id="like-icon-{{ post.id }}">
-                            {{ '❤️' if user and user_has_liked(user.id, post.id) else '♡' }}
-                        </span>
+                            class="transition flex items-center gap-2 font-black text-[10px] tracking-widest uppercase {{ 'text-rose-500' if user and user_has_liked(user.id, post.id) else 'hover:text-rose-500' }}">
+                        <svg class="w-5 h-5" fill="{{ 'currentColor' if user and user_has_liked(user.id, post.id) else 'none' }}" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                         <span id="like-count-{{ post.id }}">{{ get_like_count(post.id) }}</span>
                     </button>
                 </div>
             </article>
             {% else %}
-            <div class="p-20 text-center text-gray-500">
-                <p>Kamingaw... Wala pa'y posts si {{ target_user.username }}.</p>
+            <div class="p-20 text-center">
+                <div class="w-16 h-16 bg-gray-900 rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-800 text-2xl">📭</div>
+                <p class="text-gray-500 font-bold uppercase tracking-widest text-[10px]">No posts from this user.</p>
             </div>
             {% endfor %}
         </div>
     </main>
 
     <script>
+        document.documentElement.classList.add('dark');
+
         function handleFollow(userId) {
             fetch(`/follow/${userId}`, { method: 'POST' })
             .then(res => res.json())
@@ -151,15 +161,37 @@
                 count.innerText = data.count;
 
                 if (data.status === 'followed') {
-                    btn.className = "px-6 py-2 border border-gray-300 dark:border-gray-700 rounded-full font-bold text-sm hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition group bg-white dark:bg-gray-900";
+                    btn.className = "px-6 py-2.5 border border-gray-700 rounded-full font-black text-[10px] uppercase tracking-widest hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/50 transition group bg-black";
                     btn.innerHTML = '<span class="group-hover:hidden">Following</span><span class="hidden group-hover:inline">Unfollow</span>';
                 } else {
-                    btn.className = "px-6 py-2 bg-skyBlue text-white rounded-full font-bold text-sm hover:opacity-90 transition shadow-sm";
+                    btn.className = "px-6 py-2.5 bg-sky-500 text-white rounded-full font-black text-[10px] uppercase tracking-widest hover:bg-sky-400 transition shadow-lg shadow-sky-500/20";
                     btn.innerHTML = "Follow";
                 }
             });
         }
-        // ... include other scripts (like, comment) as needed ...
+
+        function handleLike(postId) {
+            fetch(`/like/${postId}`, { method: 'POST' })
+            .then(res => res.json())
+            .then(data => {
+                if (data.error === 'unauthorized') {
+                    window.location.href = "{{ url_for('login') }}";
+                    return;
+                }
+                const likeBtn = document.getElementById(`like-btn-${postId}`);
+                const likeCount = document.getElementById(`like-count-${postId}`);
+                const svg = likeBtn.querySelector('svg');
+                
+                likeCount.innerText = data.count;
+                if (data.status === 'liked') {
+                    likeBtn.classList.add('text-rose-500');
+                    svg.setAttribute('fill', 'currentColor');
+                } else {
+                    likeBtn.classList.remove('text-rose-500');
+                    svg.setAttribute('fill', 'none');
+                }
+            });
+        }
     </script>
 </body>
 </html>

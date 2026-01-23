@@ -1,386 +1,276 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SE7EN - {{ active_tab | capitalize if active_tab else 'Discover' }}</title>
-
-    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
-    <meta name="theme-color" content="#000000">
-    <link rel="apple-touch-icon" href="{{ url_for('static', filename='se7en-logo.png') }}">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
+    <title>SE7EN | Experience</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: { extend: { colors: { skyBlue: '#0085ff' } } }
-        };
-        if (localStorage.getItem('darkMode') === 'true') {
-            document.documentElement.classList.add('dark');
-        }
-    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Orbitron:wght@900&display=swap" rel="stylesheet">
     <style>
-        .sidebar-transition { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        .comment-enter { animation: slideIn 0.3s ease-out; }
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateX(-10px); }
-            to { opacity: 1; transform: translateX(0); }
+        :root { --bg-deep: #000000; --sky-accent: #0ea5e9; }
+        body { background-color: var(--bg-deep); color: #f1f5f9; font-family: 'Inter', sans-serif; }
+        
+        @keyframes brandPulse {
+            0% { transform: scale(1); filter: drop-shadow(0 0 0px rgba(14, 165, 233, 0)); }
+            50% { transform: scale(1.05); filter: drop-shadow(0 0 10px rgba(14, 165, 233, 0.6)); }
+            100% { transform: scale(1); filter: drop-shadow(0 0 0px rgba(14, 165, 233, 0)); }
         }
+        .animate-pulse-brand { animation: brandPulse 3s infinite ease-in-out; display: inline-block; }
+        .brand-font { font-family: 'Orbitron', sans-serif; letter-spacing: 0.15em; }
+        .text-brand-gradient { background: linear-gradient(45deg, #0ea5e9, #60a5fa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        
+        .comment-enter { animation: slideDown 0.3s ease-out; }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        
         .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
-        #newPostAlert.show { transform: translate(-50%, 0); opacity: 1; }
-        #newPostAlert { transform: translate(-50%, -200%); transition: all 0.7s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-
-        @keyframes loading {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(250%); }
+        /* Animation for side menu badge */
+        @keyframes pulse-red {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
+        .notif-pulse { animation: pulse-red 2s infinite; }
     </style>
 </head>
-<body class="bg-gray-100 dark:bg-gray-950 text-gray-900 dark:text-gray-100 transition-colors duration-300">
+<body class="selection:bg-sky-500/30">
 
-    <div id="global-loader" class="fixed inset-0 z-[100] bg-white dark:bg-[#0b0e11] flex flex-col items-center justify-center transition-opacity duration-700">
-        <div class="text-center">
-            <div class="relative inline-block mb-8">
-                <h1 class="text-7xl font-black text-blue-600 tracking-tighter animate-bounce">
-                    SE<span class="text-gray-900 dark:text-white">7</span>EN
-                </h1>
-                <div class="absolute -top-6 -right-8 text-4xl animate-spin" style="animation-duration: 3s;">🚀</div>
-            </div>
-            <div class="h-8">
-                <p id="funny-text" class="text-sm font-medium text-gray-500 dark:text-gray-400 italic">Waking up the server... 😴</p>
-            </div>
-            <div class="w-48 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full mt-6 overflow-hidden">
-                <div class="h-full bg-blue-600 animate-[loading_2s_ease-in-out_infinite]" style="width: 30%;"></div>
-            </div>
-        </div>
-    </div>
-
-    {% if has_new_post %}
-    <div id="newPostAlert" class="fixed top-5 left-1/2 z-[100] w-[92%] max-w-sm opacity-0 pointer-events-none">
-        <div class="bg-skyBlue text-white p-4 rounded-[1.8rem] shadow-2xl flex items-center justify-between border-2 border-white/20 backdrop-blur-md pointer-events-auto">
-            <div class="flex items-center gap-3">
-                <div class="bg-white/20 p-2 rounded-xl animate-bounce text-xl">✨</div>
-                <div>
-                    <p class="text-[10px] font-black opacity-80 uppercase tracking-widest">Fresh Drop</p>
-                    <p class="text-sm font-black tracking-tight">New stories are up!</p>
-                </div>
-            </div>
-            <button onclick="dismissBanner()" class="bg-black/10 hover:bg-black/20 p-2 rounded-full transition">
-                <i class="fa-solid fa-xmark"></i>
+    <nav class="sticky top-0 z-50 bg-black/80 backdrop-blur-xl border-b border-gray-800">
+        <div class="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
+            <button onclick="toggleMenu()" class="p-2.5 hover:bg-gray-800 rounded-xl transition-all active:scale-90">
+                <svg class="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 12h10M4 18h16"/></svg>
             </button>
-        </div>
-    </div>
-    {% endif %}
-
-    <nav class="sticky top-0 z-40 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border-b dark:border-gray-800">
-        <div class="max-w-2xl mx-auto px-4 py-3 flex justify-between items-center relative">
-            <div class="flex items-center gap-1">
-                <button onclick="toggleMenu()" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition group">
-                    <i class="fa-solid fa-bars text-xl group-hover:text-skyBlue"></i>
-                </button>
-                <button id="darkToggle" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition">
-                    <i class="fa-solid fa-sun text-xl text-yellow-500 dark:hidden"></i>
-                    <i class="fa-solid fa-moon text-xl text-skyBlue hidden dark:block"></i>
-                </button>
+            <div class="flex flex-col items-center">
+                <span class="brand-font text-2xl font-black text-brand-gradient italic animate-pulse-brand">SE7EN</span>
+                <div class="h-0.5 w-10 bg-sky-500 rounded-full -mt-1 opacity-50"></div>
             </div>
-            <a href="/" class="text-2xl font-black tracking-tighter text-skyBlue absolute left-1/2 -translate-x-1/2">
-                SE<span class="text-gray-900 dark:text-white">7</span>EN
-            </a>
-            <div class="flex items-center">
+            <div class="w-10 flex justify-end">
                 {% if user %}
-                    <a href="{{ url_for('user_profile', username=user.username) }}" class="w-9 h-9 rounded-full overflow-hidden border dark:border-gray-800 hover:ring-2 hover:ring-skyBlue transition">
-                        <img src="{{ user.profile_pic if user.profile_pic else 'https://ui-avatars.com/api/?name=' + user.username }}" class="w-full h-full object-cover">
-                    </a>
+                <a href="{{ url_for('profile_settings') }}" class="relative group">
+                    <div class="absolute -inset-0.5 bg-sky-500 rounded-full opacity-20 group-hover:opacity-100 transition blur"></div>
+                    <img src="{{ user.profile_pic if user.profile_pic else 'https://ui-avatars.com/api/?name=' + user.username }}" class="relative w-9 h-9 rounded-full border border-gray-700 object-cover shadow-sm">
+                </a>
                 {% else %}
-                    <a href="{{ url_for('login') }}" class="text-skyBlue font-bold text-sm">Sign In</a>
+                <a href="{{ url_for('login') }}" class="text-sky-500 hover:text-sky-400 transition font-bold text-sm">Login</a>
                 {% endif %}
             </div>
         </div>
     </nav>
 
-    <div id="sideMenu" class="fixed inset-y-0 left-0 w-72 bg-white dark:bg-gray-900 z-50 sidebar-transition -translate-x-full border-r dark:border-gray-800 shadow-2xl overflow-y-auto">
-        <div class="p-6">
-            <div class="flex justify-between items-center mb-8">
-                <h2 class="text-2xl font-black text-skyBlue tracking-tighter">SE7EN</h2>
-                <button onclick="toggleMenu()" class="text-gray-400">✕</button>
+    <div id="overlay" onclick="toggleMenu()" class="fixed inset-0 bg-black/70 z-40 hidden transition-opacity"></div>
+
+    <div id="sideMenu" class="fixed top-0 left-0 bottom-0 w-64 bg-[#0a0a0a] z-50 transform -translate-x-full transition-transform duration-300 border-r border-gray-800 shadow-2xl">
+        <div class="p-6 space-y-2">
+            <div class="mb-8 flex items-center justify-between border-b border-gray-800 pb-4">
+                <h2 class="brand-font text-xl font-black text-brand-gradient italic">SE7EN</h2>
+                <button onclick="toggleMenu()" class="text-gray-500 hover:text-sky-500">✕</button>
             </div>
-
-            <nav class="space-y-4">
-                <a href="{{ url_for('public_home') }}" class="flex items-center gap-4 p-2 text-lg font-bold hover:text-skyBlue transition">🏠 Home</a>
-                <a href="{{ url_for('inbox') }}" class="flex items-center justify-between p-2 text-lg font-bold hover:text-skyBlue transition">
-                    <span class="flex items-center gap-4">📩 Messages</span>
-                    {% if unread_count > 0 %}
-                    <span class="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full">{{ unread_count }}</span>
-                    {% endif %}
-                </a>
+            <nav class="space-y-1">
+                <a href="/" class="flex items-center gap-4 p-3 hover:bg-gray-800 rounded-xl font-bold transition text-gray-300 hover:text-sky-500"><span>🏠</span> Home</a>
                 
-                <button onclick="openTetris(); toggleMenu();" class="w-full flex items-center gap-4 p-2 text-lg font-bold text-purple-500 hover:bg-purple-500/10 rounded-xl transition">
-                    🎮 Play Tetris
-                </button>
+                {% if user %}
+                    <a href="{{ url_for('inbox') }}" class="flex items-center justify-between p-3 hover:bg-gray-800 rounded-xl font-bold transition text-gray-300 hover:text-sky-500">
+                        <div class="flex items-center gap-4">
+                            <span>💬</span> Messages
+                        </div>
+                        {% if notification_count and notification_count > 0 %}
+                        <span class="bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full notif-pulse">
+                            {{ notification_count }}
+                        </span>
+                        {% endif %}
+                    </a>
 
-                <a href="{{ url_for('dashboard') }}" class="flex items-center gap-4 p-2 text-lg font-bold hover:text-skyBlue transition">📊 Dashboard</a>
-                <a href="{{ url_for('profile_settings') }}" class="flex items-center gap-4 p-2 text-lg font-bold hover:text-skyBlue transition">⚙️ Settings</a>
-                <a href="{{ url_for('create_post') }}" class="flex items-center gap-4 p-2 text-lg font-bold hover:text-skyBlue transition">➕ New Post</a>
-                <hr class="dark:border-gray-800">
-                {% if user %}<a href="{{ url_for('logout') }}" class="flex items-center gap-4 p-2 text-lg font-bold text-red-500 hover:opacity-75 transition">🚪 Logout</a>{% endif %}
+                    <a href="{{ url_for('dashboard') }}" class="flex items-center gap-4 p-3 hover:bg-gray-800 rounded-xl font-bold transition text-gray-300"><span>📊</span> Dashboard</a>
+                    <a href="{{ url_for('user_profile', username=user.username) }}" class="flex items-center gap-4 p-3 hover:bg-gray-800 rounded-xl font-bold transition text-gray-300"><span>👤</span> Profile</a>
+                    <a href="{{ url_for('profile_settings') }}" class="flex items-center gap-4 p-3 hover:bg-gray-800 rounded-xl font-bold transition border-t border-gray-800 mt-2 pt-4 text-gray-300"><span>⚙️</span> Settings</a>
+                    <a href="{{ url_for('logout') }}" class="flex items-center gap-4 p-3 hover:bg-gray-800 rounded-xl font-bold text-red-500 transition"><span>🚪</span> Logout</a>
+                {% else %}
+                    <div class="border-t border-gray-800 mt-2 pt-4">
+                        <a href="{{ url_for('login') }}" class="flex items-center gap-4 p-3 hover:bg-gray-800 rounded-xl font-bold text-sky-500 transition"><span>🔑</span> Login</a>
+                        <a href="{{ url_for('register') }}" class="flex items-center gap-4 p-3 hover:bg-gray-800 rounded-xl font-bold text-gray-300 transition"><span>📝</span> Register</a>
+                    </div>
+                {% endif %}
             </nav>
         </div>
     </div>
-    <div id="overlay" onclick="toggleMenu()" class="fixed inset-0 bg-black/40 z-40 hidden backdrop-blur-[2px]"></div>
 
-    <main class="max-w-2xl mx-auto min-h-screen border-x dark:border-gray-800 pb-24">
-        <div class="flex border-b dark:border-gray-800 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md sticky top-[61px] z-30">
-            <a href="{{ url_for('public_home', tab='discover') }}" class="flex-1 py-4 text-center hover:bg-gray-50 dark:hover:bg-gray-800 transition relative {{ 'font-bold text-skyBlue' if active_tab == 'discover' or not active_tab else 'text-gray-500' }}">
-                Discover
-                {% if active_tab == 'discover' or not active_tab %}
-                    <div class="absolute bottom-0 left-1/4 right-1/4 h-1 bg-skyBlue rounded-full"></div>
-                {% endif %}
+    <main class="max-w-2xl mx-auto min-h-screen border-x border-gray-800 pb-24 bg-black">
+        <div class="flex border-b border-gray-800 sticky top-16 bg-black/90 backdrop-blur-md z-30">
+            <a href="{{ url_for('public_home', tab='discover') }}" class="flex-1 py-4 text-center relative {{ 'font-bold text-sky-500' if active_tab == 'discover' or not active_tab else 'text-gray-500' }}">
+                Discover {% if active_tab == 'discover' or not active_tab %}<div class="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-sky-500 rounded-full"></div>{% endif %}
             </a>
             {% if user %}
-            <a href="{{ url_for('public_home', tab='following') }}" class="flex-1 py-4 text-center hover:bg-gray-50 dark:hover:bg-gray-800 transition relative {{ 'font-bold text-skyBlue' if active_tab == 'following' else 'text-gray-500' }}">
-                Following
-                {% if active_tab == 'following' %}
-                    <div class="absolute bottom-0 left-1/4 right-1/4 h-1 bg-skyBlue rounded-full"></div>
-                {% endif %}
+            <a href="{{ url_for('public_home', tab='following') }}" class="flex-1 py-4 text-center relative {{ 'font-bold text-sky-500' if active_tab == 'following' else 'text-gray-500' }}">
+                Following {% if active_tab == 'following' %}<div class="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-sky-500 rounded-full"></div>{% endif %}
             </a>
             {% endif %}
         </div>
 
-        <div class="divide-y dark:divide-gray-800">
+        <div class="divide-y divide-gray-800">
             {% for post in posts %}
-            <article class="p-4 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition relative">
+            <article class="p-4 hover:bg-gray-900/40 transition relative group" id="post-card-{{ post.id }}">
                 <div class="flex gap-3">
                     <div class="flex-shrink-0">
                         {% set p_user = get_user_by_username(post.author) %}
-                        <a href="{{ url_for('user_profile', username=post.author) }}" class="block">
-                            <img src="{{ p_user.profile_pic if p_user and p_user.profile_pic else 'https://ui-avatars.com/api/?name=' + post.author }}" class="w-12 h-12 rounded-full object-cover">
+                        <a href="{{ url_for('user_profile', username=post.author) }}">
+                            <img src="{{ p_user.profile_pic if p_user and p_user.profile_pic else 'https://ui-avatars.com/api/?name=' + post.author }}" class="w-12 h-12 rounded-full object-cover border border-gray-800">
                         </a>
                     </div>
                     <div class="flex-1 min-w-0">
-                        <div class="flex items-center gap-1 mb-0.5">
-                            <a href="{{ url_for('user_profile', username=post.author) }}" class="font-bold truncate text-gray-900 dark:text-white">{{ post.author }}</a>
-                            <span class="text-gray-500 text-sm">· {{ time_ago(post.created_at) }}</span>
+                        <div class="flex justify-between items-start mb-1">
+                            <div class="flex items-center gap-1">
+                                <a href="{{ url_for('user_profile', username=post.author) }}" class="font-bold hover:text-sky-500 transition">{{ post.author }}</a>
+                                <span class="text-gray-600 text-sm">· {{ time_ago(post.created_at) }}</span>
+                            </div>
+                            {% if user and user.username == post.author %}
+                            <form action="{{ url_for('delete_post', post_id=post.id) }}" method="POST" onsubmit="return confirm('Delete post?');">
+                                <button type="submit" class="text-gray-600 hover:text-red-500 transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                            </form>
+                            {% endif %}
                         </div>
+
                         <a href="/post/{{ post.slug }}" class="block pr-6">
-                            <h2 class="text-[1.1rem] font-bold leading-tight mb-1">{{ post.title }}</h2>
-                            <p class="text-gray-600 dark:text-gray-300 text-[0.95rem] line-clamp-3 mb-2">{{ post.content | striptags }}</p>
+                            <h2 class="text-lg font-bold text-gray-100 hover:text-sky-400 mb-1 transition">{{ post.title }}</h2>
+                            <p class="text-gray-400 text-sm line-clamp-3 mb-3">{{ post.content | striptags }}</p>
                         </a>
+
+                        {% if post.media_file %}
+                        <div class="rounded-2xl overflow-hidden border border-gray-800 mb-3">
+                            {% if post.media_type == 'video' %}
+                            <video class="w-full max-h-96 object-contain bg-black" src="{{ post.media_file }}" controls></video>
+                            {% else %}
+                            <img src="{{ post.media_file }}" class="w-full max-h-96 object-cover" loading="lazy">
+                            {% endif %}
                         </div>
+                        {% endif %}
+
+                        <div class="flex justify-between max-w-sm text-gray-500">
+                            <button onclick="toggleComments('{{ post.id }}')" class="hover:text-sky-500 transition flex items-center gap-2 group/btn">
+                                <span class="p-2 group-hover/btn:bg-sky-500/10 rounded-full">💬</span>
+                                <span id="comment-count-{{ post.id }}">{{ get_comment_count(post.id) }}</span>
+                            </button>
+                            <button onclick="handleLike('{{ post.id }}')" id="like-btn-{{ post.id }}" class="flex items-center gap-2 group/btn {{ 'text-pink-500' if user and user_has_liked(user.id, post.id) }}">
+                                <span class="p-2 group-hover/btn:bg-pink-500/10 rounded-full" id="like-icon-{{ post.id }}">
+                                    {{ '❤️' if user and user_has_liked(user.id, post.id) else '♡' }}
+                                </span>
+                                <span id="like-count-{{ post.id }}">{{ get_like_count(post.id) }}</span>
+                            </button>
+                            <button onclick="sharePost('{{ post.title }}', '/post/{{ post.slug }}')" class="p-2 hover:text-sky-500">🔗</button>
+                        </div>
+
+                        <div id="comment-box-{{ post.id }}" class="hidden mt-4 pt-4 border-t border-gray-800">
+                            {% if user %}
+                            <div class="flex gap-2 mb-4">
+                                <img src="{{ user.profile_pic if user.profile_pic else 'https://ui-avatars.com/api/?name=' + user.username }}" class="w-8 h-8 rounded-full">
+                                <div class="flex-1 relative">
+                                    <input type="text" id="comment-input-{{ post.id }}" class="w-full bg-gray-900 border border-gray-800 rounded-full px-4 py-2 text-sm focus:ring-1 focus:ring-sky-500 outline-none" placeholder="Reply...">
+                                    <button onclick="submitComment('{{ post.id }}')" class="absolute right-3 top-1/2 -translate-y-1/2 text-sky-500 font-bold text-sm">Post</button>
+                                </div>
+                            </div>
+                            {% endif %}
+                            <div id="comments-list-{{ post.id }}" class="space-y-4">
+                                {% for comment in get_comments_for_post(post.id) %}
+                                <div id="comment-{{ comment.id }}" class="flex gap-3 group/item">
+                                    <a href="{{ url_for('user_profile', username=comment.user.username) }}">
+                                        <img src="{{ comment.user.profile_pic if comment.user.profile_pic else 'https://ui-avatars.com/api/?name=' + comment.user.username }}" class="w-8 h-8 rounded-full object-cover">
+                                    </a>
+                                    <div class="flex-1 bg-gray-900/50 p-3 rounded-2xl relative border border-gray-800">
+                                        <div class="flex justify-between items-start">
+                                            <a href="{{ url_for('user_profile', username=comment.user.username) }}" class="font-bold text-xs hover:underline text-gray-300">{{ comment.user.username }}</a>
+                                            {% if user and user.id == comment.user_id %}
+                                            <button onclick="deleteComment({{ comment.id }}, '{{ post.id }}')" class="text-gray-600 hover:text-red-500 opacity-0 group-hover/item:opacity-100 transition">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                        <p class="text-sm mt-0.5 text-gray-400">{{ comment.content }}</p>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </article>
-            {% else %}
-            <div class="p-20 text-center text-gray-500 italic">
-                <p>No posts to show right now.</p>
-            </div>
             {% endfor %}
         </div>
     </main>
 
-    <div class="fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg border-t dark:border-gray-800 sm:hidden">
-        <div class="flex justify-around items-center py-3">
-            <a href="{{ url_for('public_home') }}" class="{{ 'text-skyBlue' if active_tab in ['discover', 'following'] or not active_tab else 'text-gray-400' }}">🏠</a>
-            <a href="{{ url_for('inbox') }}" class="relative {{ 'text-skyBlue' if active_tab == 'messages' else 'text-gray-400' }}">📩</a>
-            <a href="{{ url_for('create_post') }}" class="text-gray-400">➕</a>
-            <a href="{{ url_for('profile_settings') }}" class="w-7 h-7 rounded-full overflow-hidden border-2 {{ 'border-skyBlue' if active_tab == 'settings' else 'border-gray-300' }}">
-                <img src="{{ user.profile_pic if user and user.profile_pic else 'https://ui-avatars.com/api/?name=' + (user.username if user else 'Guest') }}" class="w-full h-full object-cover">
-            </a>
-        </div>
-    </div>
-
-    <div id="tetrisModal" class="fixed inset-0 z-[100] hidden flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
-        <div class="bg-[#111418] border border-blue-500/30 w-full max-w-[340px] rounded-3xl overflow-hidden shadow-2xl">
-            <div class="p-4 border-b border-gray-800 flex justify-between items-center bg-[#15191c]">
-                <h3 class="font-black text-blue-500 italic">SE7EN ARCADE</h3>
-                <button onclick="closeTetris()" class="text-white bg-red-500/20 hover:bg-red-500 w-8 h-8 rounded-full transition">✕</button>
-            </div>
-            <div class="p-6 flex flex-col items-center">
-                <div class="flex justify-between w-full mb-4 px-2">
-                    <div><p class="text-[9px] text-gray-500 uppercase font-black">Score</p><div id="score" class="text-xl font-black text-white">0</div></div>
-                    <div class="text-right"><p class="text-[9px] text-gray-500 uppercase font-black">Status</p><div id="gameStatus" class="text-[10px] font-black text-green-500 italic uppercase">Ready</div></div>
-                </div>
-                <canvas id="tetris" width="240" height="400" class="bg-black/50 border-2 border-gray-800 rounded-xl"></canvas>
-                <div class="grid grid-cols-3 gap-3 mt-8 w-full max-w-[220px]">
-                    <button onclick="playerRotate(1)" class="col-start-2 h-12 bg-gray-800 rounded-2xl flex items-center justify-center text-white"><i class="fa-solid fa-rotate"></i></button>
-                    <button onclick="playerMove(-1)" class="col-start-1 h-12 bg-gray-800 rounded-2xl flex items-center justify-center text-white"><i class="fa-solid fa-arrow-left"></i></button>
-                    <button onclick="playerDrop()" class="col-start-2 h-12 bg-gray-800 rounded-2xl flex items-center justify-center text-white"><i class="fa-solid fa-arrow-down"></i></button>
-                    <button onclick="playerMove(1)" class="col-start-3 h-12 bg-gray-800 rounded-2xl flex items-center justify-center text-white"><i class="fa-solid fa-arrow-right"></i></button>
-                </div>
-            </div>
-        </div>
-    </div>
+    <a href="{{ url_for('create_post') }}" class="fixed bottom-24 right-6 w-14 h-14 bg-sky-500 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-all z-40">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+    </a>
 
     <script>
-        // --- TETRIS LOGIC ---
-        const canvas = document.getElementById('tetris');
-        const context = canvas.getContext('2d');
-        context.scale(20, 20);
-
-        const colors = [null, '#FF0D72', '#0DC2FF', '#0DFF72', '#F538FF', '#FF8E0D', '#FFE138', '#3877FF'];
-        
-        function createPiece(type) {
-            if (type === 'I') return [[0, 1, 0, 0], [0, 1, 0, 0], [0, 1, 0, 0], [0, 1, 0, 0]];
-            if (type === 'L') return [[0, 2, 0], [0, 2, 0], [0, 2, 2]];
-            if (type === 'J') return [[0, 3, 0], [0, 3, 0], [3, 3, 0]];
-            if (type === 'O') return [[4, 4], [4, 4]];
-            if (type === 'Z') return [[5, 5, 0], [0, 5, 5], [0, 0, 0]];
-            if (type === 'S') return [[0, 6, 6], [6, 6, 0], [0, 0, 0]];
-            if (type === 'T') return [[0, 7, 0], [7, 7, 7], [0, 0, 0]];
-        }
-
-        function draw() {
-            context.fillStyle = '#000';
-            context.fillRect(0, 0, canvas.width, canvas.height);
-            drawMatrix(arena, {x: 0, y: 0});
-            drawMatrix(player.matrix, player.pos);
-        }
-
-        function drawMatrix(matrix, offset) {
-            matrix.forEach((row, y) => {
-                row.forEach((value, x) => {
-                    if (value !== 0) {
-                        context.fillStyle = colors[value];
-                        context.fillRect(x + offset.x, y + offset.y, 1, 1);
-                    }
-                });
-            });
-        }
-
-        function merge(arena, player) {
-            player.matrix.forEach((row, y) => {
-                row.forEach((value, x) => {
-                    if (value !== 0) arena[y + player.pos.y][x + player.pos.x] = value;
-                });
-            });
-        }
-
-        function collide(arena, player) {
-            const [m, o] = [player.matrix, player.pos];
-            for (let y = 0; y < m.length; ++y) {
-                for (let x = 0; x < m[y].length; ++x) {
-                    if (m[y][x] !== 0 && (arena[y + o.y] && arena[y + o.y][x + o.x]) !== 0) return true;
-                }
-            }
-            return false;
-        }
-
-        function rotate(matrix, dir) {
-            for (let y = 0; y < matrix.length; ++y) {
-                for (let x = 0; x < y; ++x) { [matrix[x][y], matrix[y][x]] = [matrix[y][x], matrix[x][y]]; }
-            }
-            if (dir > 0) matrix.forEach(row => row.reverse()); else matrix.reverse();
-        }
-
-        function arenaSweep() {
-            let rowCount = 1;
-            outer: for (let y = arena.length - 1; y > 0; --y) {
-                for (let x = 0; x < arena[y].length; ++x) { if (arena[y][x] === 0) continue outer; }
-                const row = arena.splice(y, 1)[0].fill(0);
-                arena.unshift(row);
-                ++y;
-                player.score += rowCount * 10;
-                rowCount *= 2;
-            }
-        }
-
-        function playerDrop() {
-            player.pos.y++;
-            if (collide(arena, player)) {
-                player.pos.y--;
-                merge(arena, player);
-                playerReset();
-                arenaSweep();
-                updateScore();
-            }
-            dropCounter = 0;
-        }
-
-        function playerMove(dir) {
-            player.pos.x += dir;
-            if (collide(arena, player)) player.pos.x -= dir;
-        }
-
-        function playerReset() {
-            const pieces = 'ILJOTSZ';
-            player.matrix = createPiece(pieces[pieces.length * Math.random() | 0]);
-            player.pos.y = 0;
-            player.pos.x = (arena[0].length / 2 | 0) - (player.matrix[0].length / 2 | 0);
-            if (collide(arena, player)) {
-                arena.forEach(row => row.fill(0));
-                player.score = 0;
-                updateScore();
-            }
-        }
-
-        function playerRotate(dir) {
-            const pos = player.pos.x;
-            let offset = 1;
-            rotate(player.matrix, dir);
-            while (collide(arena, player)) {
-                player.pos.x += offset;
-                offset = -(offset + (offset > 0 ? 1 : -1));
-                if (offset > player.matrix[0].length) {
-                    rotate(player.matrix, -dir);
-                    player.pos.x = pos;
-                    return;
-                }
-            }
-        }
-
-        let dropCounter = 0;
-        let lastTime = 0;
-        function update(time = 0) {
-            const deltaTime = time - lastTime;
-            lastTime = time;
-            dropCounter += deltaTime;
-            if (dropCounter > 1000) playerDrop();
-            draw();
-            if (!document.getElementById('tetrisModal').classList.contains('hidden')) requestAnimationFrame(update);
-        }
-
-        function updateScore() { document.getElementById('score').innerText = player.score; }
-
-        const arena = Array.from({length: 20}, () => Array(12).fill(0));
-        const player = { pos: {x: 0, y: 0}, matrix: null, score: 0 };
-
-        function openTetris() {
-            document.getElementById('tetrisModal').classList.remove('hidden');
-            playerReset();
-            updateScore();
-            update();
-        }
-
-        function closeTetris() { document.getElementById('tetrisModal').classList.add('hidden'); }
-
-        // --- UI & LOADER ---
         function toggleMenu() {
             document.getElementById('sideMenu').classList.toggle('-translate-x-full');
             document.getElementById('overlay').classList.toggle('hidden');
         }
 
-        document.getElementById('darkToggle').addEventListener('click', () => {
-            document.documentElement.classList.toggle('dark');
-            localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
-        });
+        function toggleComments(postId) {
+            document.getElementById(`comment-box-${postId}`).classList.toggle('hidden');
+        }
 
-        // Loader messages
-        const messages = ["Waking up the server... 😴", "Feeding hamsters... 🐹", "Connecting to Singapore... 🇸🇬"];
-        let msgIndex = 0;
-        const msgInterval = setInterval(() => {
-            const el = document.getElementById('funny-text');
-            if(el) el.innerText = messages[++msgIndex % messages.length];
-        }, 1500);
+        function handleLike(postId) {
+            fetch(`/like/${postId}`, { method: 'POST' })
+                .then(res => res.json()).then(data => {
+                    if(data.error) return window.location.href = "/login";
+                    document.getElementById(`like-count-${postId}`).innerText = data.count;
+                    const icon = document.getElementById(`like-icon-${postId}`);
+                    const btn = document.getElementById(`like-btn-${postId}`);
+                    if(data.liked) { icon.innerText = "❤️"; btn.classList.add('text-pink-500'); }
+                    else { icon.innerText = "♡"; btn.classList.remove('text-pink-500'); }
+                });
+        }
 
-        window.addEventListener('load', () => {
-            setTimeout(() => {
-                clearInterval(msgInterval);
-                const loader = document.getElementById('global-loader');
-                loader.style.opacity = '0';
-                setTimeout(() => loader.style.display = 'none', 700);
-            }, 1000);
-        });
+        function submitComment(postId) {
+            const input = document.getElementById(`comment-input-${postId}`);
+            const content = input.value.trim();
+            if (!content) return;
+            fetch(`/comment/${postId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: content })
+            }).then(res => res.json()).then(data => {
+                if (data.error) return window.location.href = "/login";
+                const list = document.getElementById(`comments-list-${postId}`);
+                const html = `<div id="comment-${data.id}" class="flex gap-3 group/item comment-enter">
+                    <a href="/profile/${data.username}"><img src="${data.profile_pic}" class="w-8 h-8 rounded-full object-cover border border-gray-800"></a>
+                    <div class="flex-1 bg-gray-900/50 p-3 rounded-2xl relative border border-gray-800">
+                        <div class="flex justify-between items-start">
+                            <span class="font-bold text-xs text-gray-300">${data.username}</span>
+                            <button onclick="deleteComment(${data.id}, '${postId}')" class="text-gray-600 hover:text-red-500 transition">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            </button>
+                        </div>
+                        <p class="text-sm mt-0.5 text-gray-400">${data.content}</p>
+                    </div>
+                </div>`;
+                list.insertAdjacentHTML('afterbegin', html);
+                input.value = '';
+                const count = document.getElementById(`comment-count-${postId}`);
+                count.innerText = parseInt(count.innerText) + 1;
+            });
+        }
+
+        function deleteComment(commentId, postId) {
+            if (!confirm('Delete comment?')) return;
+            fetch(`/delete_comment/${commentId}`, { method: 'POST' })
+                .then(res => res.json()).then(data => {
+                    if (data.success) {
+                        document.getElementById(`comment-${commentId}`).remove();
+                        const count = document.getElementById(`comment-count-${postId}`);
+                        count.innerText = Math.max(0, parseInt(count.innerText) - 1);
+                    }
+                });
+        }
+
+        async function sharePost(title, url) {
+            try { 
+                await navigator.share({ title: title, url: window.location.origin + url }); 
+            } catch (err) { 
+                navigator.clipboard.writeText(window.location.origin + url); 
+                alert('Link copied! 📋'); 
+            }
+        }
     </script>
 </body>
 </html>

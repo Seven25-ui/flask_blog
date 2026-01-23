@@ -1,60 +1,92 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Join Seven33 • Register</title>
+    <title>Join SE7EN • Register</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Orbitron:wght@900&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg-deep: #000000; --sky-accent: #0ea5e9; }
+        body { 
+            background-color: var(--bg-deep); 
+            color: #f1f5f9; 
+            font-family: 'Inter', sans-serif;
+            background-image: radial-gradient(circle at bottom left, #0ea5e910, transparent 400px);
+        }
+        .brand-font { font-family: 'Orbitron', sans-serif; letter-spacing: 0.15em; }
+        
+        .glass-panel {
+            background: rgba(8, 8, 8, 0.85);
+            backdrop-filter: blur(16px);
+            border: 1px solid #1f2937;
+        }
+
+        .custom-input {
+            background-color: #000000;
+            border: 1px solid #1f2937;
+            transition: all 0.3s ease;
+        }
+        .custom-input:focus {
+            border-color: #0ea5e9;
+            box-shadow: 0 0 0 1px #0ea5e9;
+            outline: none;
+        }
+    </style>
 </head>
-<body class="bg-gray-50 flex items-center justify-center min-h-screen p-4">
-    <div class="max-w-md w-full bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
-        <div class="text-center mb-8">
-            <h1 class="text-3xl font-black text-blue-600 tracking-tighter">JOIN SE7EN TODAY!</h1>
-            <p class="text-gray-500 mt-2 font-medium">Create an account to start sharing.</p>
+<body class="flex items-center justify-center min-h-screen p-6 selection:bg-sky-500/30">
+
+    <div class="max-w-md w-full glass-panel p-10 rounded-[2.5rem] shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-700">
+        
+        <div class="text-center mb-10">
+            <h1 class="brand-font text-2xl text-sky-500 font-black mb-2 uppercase">Join System</h1>
+            <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-600 italic">Initialize your profile to begin</p>
         </div>
 
         {% with messages = get_flashed_messages() %}
             {% if messages %}
                 {% for message in messages %}
-                    <div class="bg-red-50 text-red-600 p-3 rounded-lg text-sm mb-4 border border-red-100 font-bold">
+                    <div class="bg-red-500/10 text-red-400 p-4 rounded-2xl text-[11px] mb-6 border border-red-500/20 font-bold flex items-center gap-3">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
                         {{ message }}
                     </div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
 
-        <form method="POST" class="space-y-5">
-            <div>
-                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Choose Username</label>
+        <form method="POST" class="space-y-6">
+            <div class="space-y-2">
+                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 ml-1">New Identity</label>
                 <input type="text" name="username" required
-                       class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition"
-                       placeholder="Username (e.g. dev_master)">
+                       class="w-full px-5 py-4 rounded-2xl custom-input text-white placeholder:text-gray-700 text-sm"
+                       placeholder="e.g. wanderer_7">
             </div>
-            <div>
-                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Create Password</label>
+
+            <div class="space-y-2">
+                <label class="block text-[10px] font-black uppercase tracking-widest text-gray-500 ml-1">Secure Key</label>
                 <input type="password" name="password" id="passwordInput" required
-                       class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition"
+                       class="w-full px-5 py-4 rounded-2xl custom-input text-white placeholder:text-gray-700 text-sm"
                        placeholder="Min. 8 characters">
                 
-                <div class="mt-2 flex items-center">
-                    <input type="checkbox" id="showPw" onclick="togglePassword()" 
-                           class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer">
-                    <label for="showPw" class="ml-2 text-xs font-semibold text-gray-500 cursor-pointer select-none">
-                        Show Password
+                <div class="mt-3 flex items-center px-1">
+                    <input type="checkbox" id="showPw" onclick="togglePassword()"
+                           class="w-4 h-4 rounded border-gray-800 bg-black text-sky-500 focus:ring-sky-500 focus:ring-offset-black cursor-pointer">
+                    <label for="showPw" class="ml-2 text-[10px] font-black uppercase tracking-wider text-gray-600 cursor-pointer select-none hover:text-gray-400 transition-colors">
+                        Show Key
                     </label>
                 </div>
             </div>
 
             <button type="submit"
-                    class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-green-200 transition transform active:scale-95">
-                Create Account
+                    class="w-full bg-sky-500 hover:bg-sky-400 text-white font-black py-5 rounded-2xl shadow-xl shadow-sky-500/10 transition-all transform active:scale-[0.98] uppercase text-xs tracking-[0.2em] mt-4">
+                Initialize Account
             </button>
         </form>
 
-        <div class="mt-8 text-center border-t pt-6">
-            <p class="text-sm text-gray-500">
-                Already have an account?
-                <a href="{{ url_for('login') }}" class="text-blue-600 font-bold hover:underline">Sign In</a>
+        <div class="mt-10 text-center border-t border-gray-900 pt-8">
+            <p class="text-xs font-bold text-gray-600 tracking-wide">
+                Part of the network? 
+                <a href="{{ url_for('login') }}" class="text-sky-500 hover:text-sky-400 ml-1 transition-colors underline decoration-2 underline-offset-4 font-black">Sign In</a>
             </p>
         </div>
     </div>
@@ -62,11 +94,7 @@
     <script>
         function togglePassword() {
             const pwInput = document.getElementById('passwordInput');
-            if (pwInput.type === "password") {
-                pwInput.type = "text";
-            } else {
-                pwInput.type = "password";
-            }
+            pwInput.type = pwInput.type === "password" ? "text" : "password";
         }
     </script>
 </body>
