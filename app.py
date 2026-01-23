@@ -8,10 +8,17 @@ from functools import wraps
 import cloudinary
 import cloudinary.uploader
 from cloudinary.uploader import upload
+# --- MGA BAG-ONG IMPORTS ---
+from flask_socketio import SocketIO, emit, join_room
+import eventlet
 
+# --- IMONG EXISTING APP CONFIG ---
 app = Flask(__name__)
 app.secret_key = "aloy_super_secret_key_733"
 
+# --- I-INITIALIZE ANG SOCKETIO ---
+# Importante ang async_mode='eventlet' para sa Render Free Tier
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 # --- HELPER PARA SA PILIPINAS TIME (UTC+8) ---
 def ph_time():
     return datetime.utcnow() + timedelta(hours=8)
@@ -207,12 +214,14 @@ def utility_processor():
     def is_following(follower_id, followed_id):
         if not follower_id: return False
         return Follow.query.filter_by(follower_id=follower_id, followed_id=followed_id).first() is not None
+# ... (ubos sa is_following function)
 
+    # KINI NGA RETURN DAPAT NAA SA SULOD SA utility_processor
     return dict(
         get_user_by_username=get_user_by_username,
         get_read_time=get_read_time,
         time_ago=time_ago,
-        get_user_status=get_user_status, # GI-APIL NA DIRI
+        get_user_status=get_user_status,
         user_has_liked=user_has_liked,
         get_like_count=get_like_count,
         get_comment_count=get_comment_count,
@@ -223,6 +232,13 @@ def utility_processor():
         now_utc=ph_time()
     )
 
+# SIGUROHA NGA KINI NGA LINE NAA SA GAWAS (Walay space sa sugod)
+@socketio.on('connect')
+def handle_connect():
+    if 'user_id' in session:
+        room = f"user_{session['user_id']}"
+        join_room(room)
+        print(f"DEBUG: User {session['user_id']} connected to room: {room}")
 # --- 4. ROUTES ---
 
 @app.route('/')
@@ -305,28 +321,49 @@ def login():
 @login_required
 def dashboard():
     user = db.session.get(User, session['user_id'])
-
-    # 1. LOGIC PARA SA MASTER ADMIN
-    # Gi-usab gikan sa 'Aloy' ngadto sa 'admin'
+    
+    # --- 1. LOGIC PARA SA MASTER ADMIN ---
     if user.username == 'admin':
         all_users = User.query.all()
-        
-        # FIX: Gi-usab ang 'timestamp' ngadto sa 'created_at' para mawala ang AttributeError
         all_messages = Message.query.order_by(Message.created_at.desc()).all()
-
+        # Admin dashboard render
         return render_template('admin.html',
                                users=all_users,
-                               messages=all_messages, # Match na ni sa imong admin.html
+                               messages=all_messages,
                                user=user)
-
-    # 2. LOGIC PARA SA NORMAL USERS
-    posts = Post.query.filter_by(author=user.username).all()
-    notification_count = 0
+    
+    # --- 2. LOGIC PARA SA NORMAL USERS (my_dashboard.html) ---
+    # Kuhaon ang imong kaugalingong mga posts
+    posts = Post.query.filter_by(author_id=user.id).order_by(Post.created_at.desc()).all()
+    
+    # I-ihap ang unread Notifications (Likes/Comments)
+    notif_count = Notification.query.filter_by(user_id=user.id, is_read=False).count()
+    
+    # I-ihap ang unread Messages (DMs)
+    msg_count = Message.query.filter_by(receiver_id=user.id, is_read=False).count()
 
     return render_template('my_dashboard.html', 
                            posts=posts, 
-                           user=user,
-                           notification_count=notification_count)
+                           user=user, 
+                           unread_notifs=notif_count,
+                           unread_msgs=msg_count)
+
+# --- 3. KINI ANG ROUTE PARA SA NOTIFICATIONS PAGE ---
+@app.route('/notifications')
+@login_required
+def notifications():
+    user_id = session['user_id']
+    
+    # Kuhaon ang tanang alerts
+    all_notifs = Notification.query.filter_by(user_id=user_id).order_by(Notification.created_at.desc()).all()
+    
+    # I-mark as read tanan inig abli sa page
+    unread = Notification.query.filter_by(user_id=user_id, is_read=False).all()
+    for n in unread:
+        n.is_read = True
+    db.session.commit()
+    
+    return render_template('notifications.html', notifications=all_notifs)
 
 @app.route('/create', methods=['GET', 'POST'])
 @login_required
@@ -446,10 +483,14 @@ def user_profile(username):
 
 @app.route('/like/<int:post_id>', methods=['POST'])
 def like_post(post_id):
-    if 'user_id' not in session: return {"error": "Unauthorized"}, 401
+    if 'user_id' not in session: 
+        return {"error": "Unauthorized"}, 401
+    
     user_id = session['user_id']
     post = Post.query.get_or_404(post_id)
 
+    # Kuhaon ang user object para sa real-time username
+    user_who_liked = db.session.get(User, user_id)
     existing_like = Like.query.filter_by(user_id=user_id, post_id=post_id).first()
 
     if existing_like:
@@ -457,11 +498,13 @@ def like_post(post_id):
         db.session.commit()
         return {"liked": False, "count": Like.query.filter_by(post_id=post_id).count()}
     else:
+        # Create bag-ong Like
         new_like = Like(user_id=user_id, post_id=post_id)
         db.session.add(new_like)
 
-        # Notification Logic
+        # Notification Logic (Database + Real-time)
         if post.author_id != user_id:
+            # 1. I-save sa Database para makita sa Notifications Page
             new_notif = Notification(
                 user_id=post.author_id,
                 sender_id=user_id,
@@ -471,40 +514,52 @@ def like_post(post_id):
             )
             db.session.add(new_notif)
 
+            # 2. I-emit ang Real-time signal sa Dashboard (SocketIO)
+            socketio.emit('notify', {
+                'message': f'❤️ {user_who_liked.username} liked your post!',
+                'type': 'like'
+            }, room=f"user_{post.author_id}")
+
         db.session.commit()
         return {"liked": True, "count": Like.query.filter_by(post_id=post_id).count()}
 
 @app.route('/comment/<int:post_id>', methods=['POST'])
 def add_comment(post_id):
-    if 'user_id' not in session: 
+    if 'user_id' not in session:
         return {"error": "Unauthorized"}, 401
-
+    
+    # Siguroha nga husto ang indentation ani:
     user = db.session.get(User, session['user_id'])
     post = Post.query.get_or_404(post_id)
 
     data = request.get_json()
     content = data.get('content', '').strip()
-    if not content: 
+    
+    if not content:
         return {"error": "Empty comment"}, 400
 
     # 1. Create ang comment object
     new_comment = Comment(post_id=post_id, user_id=user.id, content=content)
     db.session.add(new_comment)
-
+    
     # 2. Notification Logic
-    # Mo-create ra og notif kung dili ang tag-iya sa post ang nag-comment
     if post.author_id != user.id:
-        # Gi-limit nato ang message preview para dili kaayo taas sa notifications list
         preview = (content[:30] + '...') if len(content) > 30 else content
-        
+
         new_notif = Notification(
             user_id=post.author_id, # Ang makadawat (Author sa post)
-            sender_id=user.id,      # Ang nag-trigger (Kinsa ang nag-comment)
+            sender_id=user.id,      # Ang nag-trigger
             post_id=post.id,
             notif_type='comment',
             message=f"commented on your post: \"{preview}\""
         )
         db.session.add(new_notif)
+
+        # --- REAL-TIME SIGNAL ---
+        socketio.emit('notify', {
+            'message': f'💬 {user.username} commented on your post!',
+            'type': 'comment'
+        }, room=f"user_{post.author_id}")
 
     # 3. Commit tanan (Comment + Notification)
     try:
@@ -518,7 +573,7 @@ def add_comment(post_id):
     
     return {
         "success": True,
-        "id": new_comment.id,  # Gi-add nako ni para sa delete function unya
+        "id": new_comment.id,
         "username": user.username,
         "profile_pic": user.profile_pic if user.profile_pic else f"https://ui-avatars.com/api/?name={user.username}",
         "content": content,
@@ -681,13 +736,6 @@ def react_message(message_id):
         db.session.rollback()
         return {"status": "error"}, 500
 
-@app.route('/notifications')
-@login_required
-def notifications():
-    user = db.session.get(User, session['user_id'])
-    notification_count = 0
-    return render_template('notifications.html', user=user, notification_count=notification_count)
-
 @app.route('/api/unread-count')
 def unread_count():
     if 'user_id' not in session:
@@ -823,5 +871,15 @@ def admin_delete_message(msg_id):
     # I-redirect balik sa dashboard human sa pag-delete
     return redirect(url_for('dashboard'))
 
-if __name__ == "__main__":
-    app.run(debug=True, host='0.0.0.0', port=5000)
+@app.route('/test-notif')
+def test_notif():
+    if 'user_id' in session:
+        socketio.emit('notify', {
+            'message': 'SYSTEM OVERRIDE: TEST NOTIFICATION SUCCESSFUL!'
+        }, room=f"user_{session['user_id']}")
+        return "Notif Sent!"
+    return "Login first"
+
+if __name__ == '__main__':
+    # Usba ni sa pinaka-ubos nga part sa imong app.py
+    socketio.run(app, debug=True, host='0.0.0.0', port=5000)

@@ -1,62 +1,64 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Alerts - SE7EN</title>
+    <title>Neural Feed | SE7EN</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = { darkMode: 'class', theme: { extend: { colors: { skyBlue: '#0085ff' } } } };
-        if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
-    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Orbitron:wght@900&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg-deep: #000000; --sky-accent: #0ea5e9; }
+        body { background-color: var(--bg-deep); color: #f1f5f9; font-family: 'Inter', sans-serif; }
+        .brand-font { font-family: 'Orbitron', sans-serif; }
+    </style>
 </head>
-<body class="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
+<body class="selection:bg-sky-500/30">
 
-    <nav class="sticky top-0 z-40 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border-b dark:border-gray-800">
-        <div class="max-w-2xl mx-auto px-4 py-3 flex items-center gap-4">
-            <a href="{{ url_for('dashboard') }}" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+    <nav class="sticky top-0 z-40 bg-black/80 backdrop-blur-xl border-b border-gray-800">
+        <div class="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
+            <a href="{{ url_for('dashboard') }}" class="p-2 hover:bg-gray-800 rounded-xl transition text-sky-500">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/></svg>
             </a>
-            <h1 class="text-xl font-black tracking-tighter uppercase">Notifications</h1>
-        </div>
+            <h1 class="brand-font text-lg font-black tracking-widest text-sky-500 italic uppercase">Neural Alerts</h1>
+            <div class="w-10"></div> </div>
     </nav>
 
-    <main class="max-w-2xl mx-auto min-h-screen border-x dark:border-gray-800 pb-20">
-        <div class="divide-y dark:divide-gray-800">
+    <main class="max-w-2xl mx-auto min-h-screen border-x border-gray-800 pb-20">
+        <div class="divide-y divide-gray-800">
             {% if notifications %}
                 {% for notif in notifications %}
-                <div class="p-4 flex gap-4 transition {{ 'bg-skyBlue/5 dark:bg-skyBlue/10' if not notif.is_read else 'hover:bg-gray-50 dark:hover:bg-gray-800/40' }}">
-                    <div class="mt-1">
+                <div class="p-5 flex gap-4 transition group {{ 'bg-sky-500/5' if not notif.is_read else 'hover:bg-gray-900/50' }}">
+                    <div class="flex-shrink-0">
                         {% if notif.notif_type == 'like' %}
-                            <div class="w-10 h-10 bg-pink-100 dark:bg-pink-900/30 text-pink-500 rounded-full flex items-center justify-center">
-                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                            <div class="w-12 h-12 bg-pink-500/10 border border-pink-500/30 text-pink-500 rounded-2xl flex items-center justify-center">
+                                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
                             </div>
                         {% else %}
-                            <div class="w-10 h-10 bg-skyBlue/10 text-skyBlue rounded-full flex items-center justify-center">
-                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2v10z"/></svg>
+                            <div class="w-12 h-12 bg-sky-500/10 border border-sky-500/30 text-sky-500 rounded-2xl flex items-center justify-center animate-pulse">
+                                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2v10z"/></svg>
                             </div>
                         {% endif %}
                     </div>
 
                     <div class="flex-1">
-                        <p class="text-sm leading-snug">
-                            <span class="font-black hover:text-skyBlue cursor-pointer">{{ notif.sender.username }}</span> 
-                            {{ notif.message }}
+                        <p class="text-[13px] leading-snug">
+                            <span class="font-black text-sky-400 group-hover:underline cursor-pointer tracking-wide uppercase">{{ notif.sender.username }}</span>
+                            <span class="text-gray-300">{{ notif.message }}</span>
                         </p>
-                        <p class="text-[11px] text-gray-400 mt-1 font-bold">
+                        <p class="text-[10px] text-gray-600 mt-2 font-black tracking-widest uppercase">
                             {{ notif.created_at.strftime('%b %d • %I:%M %p') }}
                         </p>
                     </div>
                 </div>
                 {% endfor %}
             {% else %}
-                <div class="py-24 text-center">
-                    <div class="text-5xl mb-4 text-gray-300">🔔</div>
-                    <p class="text-gray-500 font-bold">No notifications yet.</p>
+                <div class="py-32 text-center">
+                    <div class="text-6xl mb-6 opacity-20">📡</div>
+                    <p class="brand-font text-xs text-gray-600 font-black tracking-[0.3em] uppercase">No Signals Detected</p>
                 </div>
             {% endif %}
         </div>
     </main>
 
-    </body>
+</body>
 </html>
