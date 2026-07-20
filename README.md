@@ -14,7 +14,7 @@ A simple Flask-based blog application with user authentication, post management,
 - Ready for deployment on Render free tier
 
 ## Live Demo
-Check the live blog deployed on Render: [Flask Blog Live](https://flask-blog-ppop.onrender.com/dashboard)
+Check the live blog deployed on Render: [Flask Blog Live](https://flask-blog-v2.onrender.com/)
 
 ## Screenshots
 
