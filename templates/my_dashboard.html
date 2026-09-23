@@ -8,20 +8,20 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Orbitron:wght@900&display=swap" rel="stylesheet">
     <style>
         :root { --bg-deep: #000000; --sky-accent: #0ea5e9; }
-        
-        body { 
-            background-color: var(--bg-deep); 
-            color: #f1f5f9; 
-            font-family: 'Inter', sans-serif; 
-            overflow-x: hidden; 
+
+        body {
+            background-color: var(--bg-deep);
+            color: #f1f5f9;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
         }
 
         .brand-font { font-family: 'Orbitron', sans-serif; letter-spacing: 0.15em; }
-        
-        .text-brand-gradient { 
-            background: linear-gradient(45deg, #0ea5e9, #60a5fa); 
-            -webkit-background-clip: text; 
-            -webkit-text-fill-color: transparent; 
+
+        .text-brand-gradient {
+            background: linear-gradient(45deg, #0ea5e9, #60a5fa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
         /* Animations */
@@ -30,7 +30,7 @@
             50% { transform: scale(1.05); filter: drop-shadow(0 0 10px rgba(14, 165, 233, 0.6)); }
         }
         .animate-pulse-brand { animation: brandPulse 3s infinite ease-in-out; }
-        
+
         .sidebar-transition { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
 
         @keyframes glitch-anim {
@@ -46,6 +46,9 @@
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: #000; }
         ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
+
+        .desk-link { transition: all .15s ease; }
+        .desk-link:hover { background: rgba(255,255,255,0.05); }
     </style>
 </head>
 <body class="selection:bg-sky-500/30">
@@ -69,7 +72,8 @@
 
 <audio id="notifSound" src="https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3" preload="auto"></audio>
 
-<nav class="sticky top-0 z-50 bg-black/80 backdrop-blur-xl border-b border-gray-800">
+<!-- Mobile-only top bar -->
+<nav class="lg:hidden sticky top-0 z-50 bg-black/80 backdrop-blur-xl border-b border-gray-800">
     <div class="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
         <button onclick="toggleMenu()" class="p-2 hover:bg-gray-800 rounded-lg">
             <svg class="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 12h10M4 18h16"/></svg>
@@ -90,8 +94,8 @@
     </div>
 </nav>
 
-<div id="overlay" onclick="toggleMenu()" class="fixed inset-0 bg-black/70 z-40 hidden backdrop-blur-[2px]"></div>
-<div id="sideMenu" class="fixed top-0 left-0 bottom-0 w-64 bg-[#0a0a0a] z-50 transform -translate-x-full sidebar-transition border-r border-gray-800">
+<div id="overlay" onclick="toggleMenu()" class="lg:hidden fixed inset-0 bg-black/70 z-40 hidden backdrop-blur-[2px]"></div>
+<div id="sideMenu" class="lg:hidden fixed top-0 left-0 bottom-0 w-64 bg-[#0a0a0a] z-50 transform -translate-x-full sidebar-transition border-r border-gray-800">
     <div class="p-6">
         <h2 class="brand-font text-xl font-black text-brand-gradient italic mb-8">SE7EN</h2>
         <nav class="flex flex-col gap-1">
@@ -104,57 +108,86 @@
     </div>
 </div>
 
-<main class="max-w-2xl mx-auto min-h-screen border-x border-gray-800 pb-32">
-    
-    <div class="p-6 border-b border-gray-800">
-        <div class="bg-gradient-to-br from-sky-600 to-blue-800 p-8 rounded-[2.5rem] text-white shadow-2xl shadow-sky-500/20">
-            <h2 class="text-3xl font-black mb-2 tracking-tight">Welcome, {{ user.username }}!</h2>
-            <p class="text-sky-100 text-sm opacity-90 mb-6 font-medium">Identify: Aloy | Status: Active Admin</p>
-            <a href="{{ url_for('create_post') }}" class="inline-flex items-center px-8 py-4 bg-white text-sky-600 font-black rounded-2xl text-xs tracking-widest uppercase hover:scale-105 transition-transform">
-                + New Deployment
+<!-- Desktop shell -->
+<div class="lg:flex lg:w-full lg:max-w-[1280px] lg:mx-auto">
+
+    <!-- LEFT: persistent desktop sidebar -->
+    <aside class="hidden lg:flex lg:flex-col lg:w-64 xl:w-72 lg:h-screen lg:sticky lg:top-0 lg:shrink-0 border-r border-gray-800 px-4 py-6">
+        <a href="{{ url_for('public_home') }}" class="flex items-center gap-2 px-2 mb-8">
+            <span class="brand-font text-2xl font-black text-brand-gradient italic animate-pulse-brand">SE7EN</span>
+        </a>
+
+        <nav class="flex-1 space-y-1">
+            <a href="{{ url_for('public_home') }}" class="desk-link flex items-center gap-4 px-3 py-3 rounded-xl font-bold text-gray-300"><span class="text-xl">🏠</span> <span>Home</span></a>
+            <a href="{{ url_for('dashboard') }}" class="flex items-center gap-4 px-3 py-3 bg-sky-500/10 text-sky-500 rounded-xl font-bold"><span class="text-xl">📊</span> <span>Dashboard</span></a>
+            {% if user %}
+            <a href="{{ url_for('notifications') }}" class="desk-link flex items-center justify-between px-3 py-3 rounded-xl font-bold text-gray-300">
+                <div class="flex items-center gap-4"><span class="text-xl">🔔</span> <span>Notifications</span></div>
+                <span id="notif-badge-desktop" class="hidden w-2.5 h-2.5 rounded-full bg-sky-500"></span>
             </a>
-        </div>
-    </div>
+            {% endif %}
+            <a href="{{ url_for('profile_settings') }}" class="desk-link flex items-center gap-4 px-3 py-3 rounded-xl font-bold text-gray-300"><span class="text-xl">⚙️</span> <span>Settings</span></a>
+        </nav>
 
-    <div class="px-6 py-4 grid grid-cols-3 gap-4 border-b border-gray-800">
-        <div class="bg-gray-900/50 p-4 rounded-2xl border border-gray-800 text-center">
-            <div class="text-xs text-gray-500 font-black mb-1 uppercase tracking-tighter">Total</div>
-            <div class="text-xl font-black text-white">{{ posts|length }}</div>
-        </div>
-        <div class="bg-gray-900/50 p-4 rounded-2xl border border-gray-800 text-center">
-            <div class="text-xs text-gray-500 font-black mb-1 uppercase tracking-tighter">Live</div>
-            <div class="text-xl font-black text-green-500">{{ posts|selectattr('approved', 'equalto', true)|list|length }}</div>
-        </div>
-        <div class="bg-gray-900/50 p-4 rounded-2xl border border-gray-800 text-center">
-            <div class="text-xs text-gray-500 font-black mb-1 uppercase tracking-tighter">Queue</div>
-            <div class="text-xl font-black text-yellow-500">{{ posts|selectattr('approved', 'equalto', false)|list|length }}</div>
-        </div>
-    </div>
+        <a href="{{ url_for('create_post') }}" class="w-full text-center bg-sky-500 hover:bg-sky-400 text-white font-bold py-3 rounded-full transition shadow-lg shadow-sky-500/20 mb-4">
+            + New Post
+        </a>
+        <a href="{{ url_for('logout') }}" class="desk-link flex items-center gap-4 px-3 py-3 rounded-xl font-bold text-red-500"><span class="text-xl">🚪</span> <span>Logout</span></a>
+    </aside>
 
-    <div class="divide-y divide-gray-800">
-        {% if posts %}
-            {% for post in posts %}
-            <article class="p-6 hover:bg-white/[0.02] transition-all group">
-                <div class="flex justify-between items-start mb-6">
-                    <div>
-                        <h3 class="font-bold text-lg text-gray-100 mb-1 leading-tight group-hover:text-sky-400 transition">{{ post.title }}</h3>
-                        <p class="text-[10px] text-gray-500 uppercase tracking-widest font-black italic">Timestamp: {{ post.created_at.strftime('%Y-%m-%d') }}</p>
+    <!-- CENTER: dashboard content -->
+    <main class="w-full lg:max-w-3xl min-h-screen lg:border-x border-gray-800 pb-32">
+
+        <div class="p-6 border-b border-gray-800">
+            <div class="bg-gradient-to-br from-sky-600 to-blue-800 lg:p-10 p-8 rounded-[2.5rem] text-white shadow-2xl shadow-sky-500/20">
+                <h2 class="text-3xl lg:text-4xl font-black mb-2 tracking-tight">Welcome, {{ user.username }}!</h2>
+                <p class="text-sky-100 text-sm opacity-90 mb-6 font-medium">Identify: Aloy | Status: Active Admin</p>
+                <a href="{{ url_for('create_post') }}" class="inline-flex items-center px-8 py-4 bg-white text-sky-600 font-black rounded-2xl text-xs tracking-widest uppercase hover:scale-105 transition-transform">
+                    + New Deployment
+                </a>
+            </div>
+        </div>
+
+        <div class="px-6 py-4 grid grid-cols-3 gap-4 border-b border-gray-800">
+            <div class="bg-gray-900/50 p-4 lg:p-6 rounded-2xl border border-gray-800 text-center">
+                <div class="text-xs text-gray-500 font-black mb-1 uppercase tracking-tighter">Total</div>
+                <div class="text-xl lg:text-2xl font-black text-white">{{ posts|length }}</div>
+            </div>
+            <div class="bg-gray-900/50 p-4 lg:p-6 rounded-2xl border border-gray-800 text-center">
+                <div class="text-xs text-gray-500 font-black mb-1 uppercase tracking-tighter">Live</div>
+                <div class="text-xl lg:text-2xl font-black text-green-500">{{ posts|selectattr('approved', 'equalto', true)|list|length }}</div>
+            </div>
+            <div class="bg-gray-900/50 p-4 lg:p-6 rounded-2xl border border-gray-800 text-center">
+                <div class="text-xs text-gray-500 font-black mb-1 uppercase tracking-tighter">Queue</div>
+                <div class="text-xl lg:text-2xl font-black text-yellow-500">{{ posts|selectattr('approved', 'equalto', false)|list|length }}</div>
+            </div>
+        </div>
+
+        <div class="lg:grid lg:grid-cols-2 divide-y divide-gray-800 lg:divide-y-0">
+            {% if posts %}
+                {% for post in posts %}
+                <article class="p-6 hover:bg-white/[0.02] transition-all group lg:border-b lg:border-gray-800 {{ 'lg:border-r' if loop.index0 is even }}">
+                    <div class="flex justify-between items-start mb-6">
+                        <div>
+                            <h3 class="font-bold text-lg text-gray-100 mb-1 leading-tight group-hover:text-sky-400 transition">{{ post.title }}</h3>
+                            <p class="text-[10px] text-gray-500 uppercase tracking-widest font-black italic">Timestamp: {{ post.created_at.strftime('%Y-%m-%d') }}</p>
+                        </div>
+                        <span class="px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-tighter border {{ 'border-green-500/30 bg-green-500/5 text-green-400' if post.approved else 'border-yellow-500/30 bg-yellow-500/5 text-yellow-400' }}">
+                            {{ 'Published' if post.approved else 'In Review' }}
+                        </span>
                     </div>
-                    <span class="px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-tighter border {{ 'border-green-500/30 bg-green-500/5 text-green-400' if post.approved else 'border-yellow-500/30 bg-yellow-500/5 text-yellow-400' }}">
-                        {{ 'Published' if post.approved else 'In Review' }}
-                    </span>
-                </div>
-                <div class="flex gap-3">
-                    <a href="{{ url_for('view_post', slug=post.slug) }}" class="flex-1 py-3 text-center bg-gray-900 border border-gray-700 rounded-xl text-[10px] font-black tracking-widest hover:border-sky-500 transition">VIEW DATA</a>
-                    <a href="{{ url_for('edit_post', post_id=post.id) }}" class="flex-1 py-3 text-center bg-sky-500/10 text-sky-500 border border-sky-500/20 rounded-xl text-[10px] font-black tracking-widest hover:bg-sky-500 hover:text-white transition">MODIFY</a>
-                </div>
-            </article>
-            {% endfor %}
-        {% else %}
-            <div class="p-20 text-center text-gray-600 font-black uppercase tracking-[0.3em] text-xs">No active nodes detected.</div>
-        {% endif %}
-    </div>
-</main>
+                    <div class="flex gap-3">
+                        <a href="{{ url_for('view_post', slug=post.slug) }}" class="flex-1 py-3 text-center bg-gray-900 border border-gray-700 rounded-xl text-[10px] font-black tracking-widest hover:border-sky-500 transition">VIEW DATA</a>
+                        <a href="{{ url_for('edit_post', post_id=post.id) }}" class="flex-1 py-3 text-center bg-sky-500/10 text-sky-500 border border-sky-500/20 rounded-xl text-[10px] font-black tracking-widest hover:bg-sky-500 hover:text-white transition">MODIFY</a>
+                    </div>
+                </article>
+                {% endfor %}
+            {% else %}
+                <div class="lg:col-span-2 p-20 text-center text-gray-600 font-black uppercase tracking-[0.3em] text-xs">No active nodes detected.</div>
+            {% endif %}
+        </div>
+    </main>
+</div>
 
 <script>
     function toggleMenu() {
@@ -214,6 +247,7 @@
     const socket = io();
     socket.on('notify', (data) => {
         document.getElementById('notif-badge')?.classList.remove('hidden');
+        document.getElementById('notif-badge-desktop')?.classList.remove('hidden');
         document.getElementById('notifSound')?.play().catch(()=>{});
         showToast(data.message);
     });
