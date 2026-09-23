@@ -9,7 +9,7 @@
     <style>
         :root { --bg-deep: #000000; --sky-accent: #0ea5e9; }
         body { background-color: var(--bg-deep); color: #f1f5f9; font-family: 'Inter', sans-serif; }
-        
+
         @keyframes brandPulse {
             0% { transform: scale(1); filter: drop-shadow(0 0 0px rgba(14, 165, 233, 0)); }
             50% { transform: scale(1.05); filter: drop-shadow(0 0 10px rgba(14, 165, 233, 0.6)); }
@@ -18,10 +18,10 @@
         .animate-pulse-brand { animation: brandPulse 3s infinite ease-in-out; display: inline-block; }
         .brand-font { font-family: 'Orbitron', sans-serif; letter-spacing: 0.15em; }
         .text-brand-gradient { background: linear-gradient(45deg, #0ea5e9, #60a5fa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        
+
         .comment-enter { animation: slideDown 0.3s ease-out; }
         @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-        
+
         .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
         /* Animation for side menu badge */
@@ -30,11 +30,16 @@
             50% { opacity: 0.5; }
         }
         .notif-pulse { animation: pulse-red 2s infinite; }
+
+        /* Desktop nav link active state helper */
+        .desk-link { transition: all .15s ease; }
+        .desk-link:hover { background: rgba(255,255,255,0.05); }
     </style>
 </head>
 <body class="selection:bg-sky-500/30">
 
-    <nav class="sticky top-0 z-50 bg-black/80 backdrop-blur-xl border-b border-gray-800">
+    <!-- Mobile-only top bar -->
+    <nav class="lg:hidden sticky top-0 z-50 bg-black/80 backdrop-blur-xl border-b border-gray-800">
         <div class="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
             <button onclick="toggleMenu()" class="p-2.5 hover:bg-gray-800 rounded-xl transition-all active:scale-90">
                 <svg class="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 12h10M4 18h16"/></svg>
@@ -56,9 +61,10 @@
         </div>
     </nav>
 
-    <div id="overlay" onclick="toggleMenu()" class="fixed inset-0 bg-black/70 z-40 hidden transition-opacity"></div>
+    <div id="overlay" onclick="toggleMenu()" class="fixed inset-0 bg-black/70 z-40 hidden transition-opacity lg:hidden"></div>
 
-    <div id="sideMenu" class="fixed top-0 left-0 bottom-0 w-64 bg-[#0a0a0a] z-50 transform -translate-x-full transition-transform duration-300 border-r border-gray-800 shadow-2xl">
+    <!-- Mobile slide-out drawer -->
+    <div id="sideMenu" class="lg:hidden fixed top-0 left-0 bottom-0 w-64 bg-[#0a0a0a] z-50 transform -translate-x-full transition-transform duration-300 border-r border-gray-800 shadow-2xl">
         <div class="p-6 space-y-2">
             <div class="mb-8 flex items-center justify-between border-b border-gray-800 pb-4">
                 <h2 class="brand-font text-xl font-black text-brand-gradient italic">SE7EN</h2>
@@ -66,7 +72,7 @@
             </div>
             <nav class="space-y-1">
                 <a href="/" class="flex items-center gap-4 p-3 hover:bg-gray-800 rounded-xl font-bold transition text-gray-300 hover:text-sky-500"><span>🏠</span> Home</a>
-                
+
                 {% if user %}
                     <a href="{{ url_for('inbox') }}" class="flex items-center justify-between p-3 hover:bg-gray-800 rounded-xl font-bold transition text-gray-300 hover:text-sky-500">
                         <div class="flex items-center gap-4">
@@ -93,109 +99,173 @@
         </div>
     </div>
 
-    <main class="max-w-2xl mx-auto min-h-screen border-x border-gray-800 pb-24 bg-black">
-        <div class="flex border-b border-gray-800 sticky top-16 bg-black/90 backdrop-blur-md z-30">
-            <a href="{{ url_for('public_home', tab='discover') }}" class="flex-1 py-4 text-center relative {{ 'font-bold text-sky-500' if active_tab == 'discover' or not active_tab else 'text-gray-500' }}">
-                Discover {% if active_tab == 'discover' or not active_tab %}<div class="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-sky-500 rounded-full"></div>{% endif %}
+    <!-- Desktop 3-column shell -->
+    <div class="lg:flex lg:w-full lg:max-w-[1280px] lg:mx-auto">
+
+        <!-- LEFT: persistent desktop sidebar -->
+        <aside class="hidden lg:flex lg:flex-col lg:w-64 xl:w-72 lg:h-screen lg:sticky lg:top-0 lg:shrink-0 border-r border-gray-800 px-4 py-6">
+            <a href="/" class="flex items-center gap-2 px-2 mb-8">
+                <span class="brand-font text-2xl font-black text-brand-gradient italic animate-pulse-brand">SE7EN</span>
             </a>
-            {% if user %}
-            <a href="{{ url_for('public_home', tab='following') }}" class="flex-1 py-4 text-center relative {{ 'font-bold text-sky-500' if active_tab == 'following' else 'text-gray-500' }}">
-                Following {% if active_tab == 'following' %}<div class="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-sky-500 rounded-full"></div>{% endif %}
-            </a>
-            {% endif %}
-        </div>
 
-        <div class="divide-y divide-gray-800">
-            {% for post in posts %}
-            <article class="p-4 hover:bg-gray-900/40 transition relative group" id="post-card-{{ post.id }}">
-                <div class="flex gap-3">
-                    <div class="flex-shrink-0">
-                        {% set p_user = get_user_by_username(post.author) %}
-                        <a href="{{ url_for('user_profile', username=post.author) }}">
-                            <img src="{{ p_user.profile_pic if p_user and p_user.profile_pic else 'https://ui-avatars.com/api/?name=' + post.author }}" class="w-12 h-12 rounded-full object-cover border border-gray-800">
-                        </a>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <div class="flex justify-between items-start mb-1">
-                            <div class="flex items-center gap-1">
-                                <a href="{{ url_for('user_profile', username=post.author) }}" class="font-bold hover:text-sky-500 transition">{{ post.author }}</a>
-                                <span class="text-gray-600 text-sm">· {{ time_ago(post.created_at) }}</span>
-                            </div>
-                            {% if user and user.username == post.author %}
-                            <form action="{{ url_for('delete_post', post_id=post.id) }}" method="POST" onsubmit="return confirm('Delete post?');">
-                                <button type="submit" class="text-gray-600 hover:text-red-500 transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
-                            </form>
-                            {% endif %}
-                        </div>
+            <nav class="flex-1 space-y-1">
+                <a href="/" class="desk-link flex items-center gap-4 px-3 py-3 rounded-xl font-bold text-gray-200"><span class="text-xl">🏠</span> <span>Home</span></a>
 
-                        <a href="/post/{{ post.slug }}" class="block pr-6">
-                            <h2 class="text-lg font-bold text-gray-100 hover:text-sky-400 mb-1 transition">{{ post.title }}</h2>
-                            <p class="text-gray-400 text-sm line-clamp-3 mb-3">{{ post.content | striptags }}</p>
-                        </a>
-
-                        {% if post.media_file %}
-                        <div class="rounded-2xl overflow-hidden border border-gray-800 mb-3">
-                            {% if post.media_type == 'video' %}
-                            <video class="w-full max-h-96 object-contain bg-black" src="{{ post.media_file }}" controls></video>
-                            {% else %}
-                            <img src="{{ post.media_file }}" class="w-full max-h-96 object-cover" loading="lazy">
-                            {% endif %}
-                        </div>
+                {% if user %}
+                    <a href="{{ url_for('inbox') }}" class="desk-link flex items-center justify-between px-3 py-3 rounded-xl font-bold text-gray-200">
+                        <div class="flex items-center gap-4"><span class="text-xl">💬</span> <span>Messages</span></div>
+                        {% if notification_count and notification_count > 0 %}
+                        <span class="bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full notif-pulse">{{ notification_count }}</span>
                         {% endif %}
+                    </a>
+                    <a href="{{ url_for('dashboard') }}" class="desk-link flex items-center gap-4 px-3 py-3 rounded-xl font-bold text-gray-200"><span class="text-xl">📊</span> <span>Dashboard</span></a>
+                    <a href="{{ url_for('user_profile', username=user.username) }}" class="desk-link flex items-center gap-4 px-3 py-3 rounded-xl font-bold text-gray-200"><span class="text-xl">👤</span> <span>Profile</span></a>
+                    <a href="{{ url_for('profile_settings') }}" class="desk-link flex items-center gap-4 px-3 py-3 rounded-xl font-bold text-gray-200"><span class="text-xl">⚙️</span> <span>Settings</span></a>
+                {% else %}
+                    <a href="{{ url_for('login') }}" class="desk-link flex items-center gap-4 px-3 py-3 rounded-xl font-bold text-sky-500"><span class="text-xl">🔑</span> <span>Login</span></a>
+                    <a href="{{ url_for('register') }}" class="desk-link flex items-center gap-4 px-3 py-3 rounded-xl font-bold text-gray-200"><span class="text-xl">📝</span> <span>Register</span></a>
+                {% endif %}
+            </nav>
 
-                        <div class="flex justify-between max-w-sm text-gray-500">
-                            <button onclick="toggleComments('{{ post.id }}')" class="hover:text-sky-500 transition flex items-center gap-2 group/btn">
-                                <span class="p-2 group-hover/btn:bg-sky-500/10 rounded-full">💬</span>
-                                <span id="comment-count-{{ post.id }}">{{ get_comment_count(post.id) }}</span>
-                            </button>
-                            <button onclick="handleLike('{{ post.id }}')" id="like-btn-{{ post.id }}" class="flex items-center gap-2 group/btn {{ 'text-pink-500' if user and user_has_liked(user.id, post.id) }}">
-                                <span class="p-2 group-hover/btn:bg-pink-500/10 rounded-full" id="like-icon-{{ post.id }}">
-                                    {{ '❤️' if user and user_has_liked(user.id, post.id) else '♡' }}
-                                </span>
-                                <span id="like-count-{{ post.id }}">{{ get_like_count(post.id) }}</span>
-                            </button>
-                            <button onclick="sharePost('{{ post.title }}', '/post/{{ post.slug }}')" class="p-2 hover:text-sky-500">🔗</button>
+            {% if user %}
+            <a href="{{ url_for('create_post') }}" class="w-full text-center bg-sky-500 hover:bg-sky-400 text-white font-bold py-3 rounded-full transition shadow-lg shadow-sky-500/20 mb-4">
+                + Create Post
+            </a>
+            <a href="{{ url_for('logout') }}" class="desk-link flex items-center gap-4 px-3 py-3 rounded-xl font-bold text-red-500"><span class="text-xl">🚪</span> <span>Logout</span></a>
+            {% endif %}
+        </aside>
+
+        <!-- CENTER: feed -->
+        <main class="w-full lg:max-w-2xl min-h-screen border-x border-gray-800 pb-24 bg-black">
+            <div class="flex border-b border-gray-800 sticky top-16 lg:top-0 bg-black/90 backdrop-blur-md z-30">
+                <a href="{{ url_for('public_home', tab='discover') }}" class="flex-1 py-4 text-center relative {{ 'font-bold text-sky-500' if active_tab == 'discover' or not active_tab else 'text-gray-500' }}">
+                    Discover {% if active_tab == 'discover' or not active_tab %}<div class="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-sky-500 rounded-full"></div>{% endif %}
+                </a>
+                {% if user %}
+                <a href="{{ url_for('public_home', tab='following') }}" class="flex-1 py-4 text-center relative {{ 'font-bold text-sky-500' if active_tab == 'following' else 'text-gray-500' }}">
+                    Following {% if active_tab == 'following' %}<div class="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-sky-500 rounded-full"></div>{% endif %}
+                </a>
+                {% endif %}
+            </div>
+
+            <div class="divide-y divide-gray-800">
+                {% for post in posts %}
+                <article class="p-4 hover:bg-gray-900/40 transition relative group" id="post-card-{{ post.id }}">
+                    <div class="flex gap-3">
+                        <div class="flex-shrink-0">
+                            {% set p_user = get_user_by_username(post.author) %}
+                            <a href="{{ url_for('user_profile', username=post.author) }}">
+                                <img src="{{ p_user.profile_pic if p_user and p_user.profile_pic else 'https://ui-avatars.com/api/?name=' + post.author }}" class="w-12 h-12 rounded-full object-cover border border-gray-800">
+                            </a>
                         </div>
-
-                        <div id="comment-box-{{ post.id }}" class="hidden mt-4 pt-4 border-t border-gray-800">
-                            {% if user %}
-                            <div class="flex gap-2 mb-4">
-                                <img src="{{ user.profile_pic if user.profile_pic else 'https://ui-avatars.com/api/?name=' + user.username }}" class="w-8 h-8 rounded-full">
-                                <div class="flex-1 relative">
-                                    <input type="text" id="comment-input-{{ post.id }}" class="w-full bg-gray-900 border border-gray-800 rounded-full px-4 py-2 text-sm focus:ring-1 focus:ring-sky-500 outline-none" placeholder="Reply...">
-                                    <button onclick="submitComment('{{ post.id }}')" class="absolute right-3 top-1/2 -translate-y-1/2 text-sky-500 font-bold text-sm">Post</button>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex justify-between items-start mb-1">
+                                <div class="flex items-center gap-1">
+                                    <a href="{{ url_for('user_profile', username=post.author) }}" class="font-bold hover:text-sky-500 transition">{{ post.author }}</a>
+                                    <span class="text-gray-600 text-sm">· {{ time_ago(post.created_at) }}</span>
                                 </div>
+                                {% if user and user.username == post.author %}
+                                <form action="{{ url_for('delete_post', post_id=post.id) }}" method="POST" onsubmit="return confirm('Delete post?');">
+                                    <button type="submit" class="text-gray-600 hover:text-red-500 transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                                </form>
+                                {% endif %}
+                            </div>
+
+                            <a href="/post/{{ post.slug }}" class="block pr-6">
+                                <h2 class="text-lg font-bold text-gray-100 hover:text-sky-400 mb-1 transition">{{ post.title }}</h2>
+                                <p class="text-gray-400 text-sm line-clamp-3 mb-3">{{ post.content | striptags }}</p>
+                            </a>
+
+                            {% if post.media_file %}
+                            <div class="rounded-2xl overflow-hidden border border-gray-800 mb-3">
+                                {% if post.media_type == 'video' %}
+                                <video class="w-full max-h-96 object-contain bg-black" src="{{ post.media_file }}" controls></video>
+                                {% else %}
+                                <img src="{{ post.media_file }}" class="w-full max-h-96 object-cover" loading="lazy">
+                                {% endif %}
                             </div>
                             {% endif %}
-                            <div id="comments-list-{{ post.id }}" class="space-y-4">
-                                {% for comment in get_comments_for_post(post.id) %}
-                                <div id="comment-{{ comment.id }}" class="flex gap-3 group/item">
-                                    <a href="{{ url_for('user_profile', username=comment.user.username) }}">
-                                        <img src="{{ comment.user.profile_pic if comment.user.profile_pic else 'https://ui-avatars.com/api/?name=' + comment.user.username }}" class="w-8 h-8 rounded-full object-cover">
-                                    </a>
-                                    <div class="flex-1 bg-gray-900/50 p-3 rounded-2xl relative border border-gray-800">
-                                        <div class="flex justify-between items-start">
-                                            <a href="{{ url_for('user_profile', username=comment.user.username) }}" class="font-bold text-xs hover:underline text-gray-300">{{ comment.user.username }}</a>
-                                            {% if user and user.id == comment.user_id %}
-                                            <button onclick="deleteComment({{ comment.id }}, '{{ post.id }}')" class="text-gray-600 hover:text-red-500 opacity-0 group-hover/item:opacity-100 transition">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                            </button>
-                                            {% endif %}
-                                        </div>
-                                        <p class="text-sm mt-0.5 text-gray-400">{{ comment.content }}</p>
+
+                            <div class="flex justify-between max-w-sm text-gray-500">
+                                <button onclick="toggleComments('{{ post.id }}')" class="hover:text-sky-500 transition flex items-center gap-2 group/btn">
+                                    <span class="p-2 group-hover/btn:bg-sky-500/10 rounded-full">💬</span>
+                                    <span id="comment-count-{{ post.id }}">{{ get_comment_count(post.id) }}</span>
+                                </button>
+                                <button onclick="handleLike('{{ post.id }}')" id="like-btn-{{ post.id }}" class="flex items-center gap-2 group/btn {{ 'text-pink-500' if user and user_has_liked(user.id, post.id) }}">
+                                    <span class="p-2 group-hover/btn:bg-pink-500/10 rounded-full" id="like-icon-{{ post.id }}">
+                                        {{ '❤️' if user and user_has_liked(user.id, post.id) else '♡' }}
+                                    </span>
+                                    <span id="like-count-{{ post.id }}">{{ get_like_count(post.id) }}</span>
+                                </button>
+                                <button onclick="sharePost('{{ post.title }}', '/post/{{ post.slug }}')" class="p-2 hover:text-sky-500">🔗</button>
+                            </div>
+
+                            <div id="comment-box-{{ post.id }}" class="hidden mt-4 pt-4 border-t border-gray-800">
+                                {% if user %}
+                                <div class="flex gap-2 mb-4">
+                                    <img src="{{ user.profile_pic if user.profile_pic else 'https://ui-avatars.com/api/?name=' + user.username }}" class="w-8 h-8 rounded-full">
+                                    <div class="flex-1 relative">
+                                        <input type="text" id="comment-input-{{ post.id }}" class="w-full bg-gray-900 border border-gray-800 rounded-full px-4 py-2 text-sm focus:ring-1 focus:ring-sky-500 outline-none" placeholder="Reply...">
+                                        <button onclick="submitComment('{{ post.id }}')" class="absolute right-3 top-1/2 -translate-y-1/2 text-sky-500 font-bold text-sm">Post</button>
                                     </div>
                                 </div>
-                                {% endfor %}
+                                {% endif %}
+                                <div id="comments-list-{{ post.id }}" class="space-y-4">
+                                    {% for comment in get_comments_for_post(post.id) %}
+                                    <div id="comment-{{ comment.id }}" class="flex gap-3 group/item">
+                                        <a href="{{ url_for('user_profile', username=comment.user.username) }}">
+                                            <img src="{{ comment.user.profile_pic if comment.user.profile_pic else 'https://ui-avatars.com/api/?name=' + comment.user.username }}" class="w-8 h-8 rounded-full object-cover">
+                                        </a>
+                                        <div class="flex-1 bg-gray-900/50 p-3 rounded-2xl relative border border-gray-800">
+                                            <div class="flex justify-between items-start">
+                                                <a href="{{ url_for('user_profile', username=comment.user.username) }}" class="font-bold text-xs hover:underline text-gray-300">{{ comment.user.username }}</a>
+                                                {% if user and user.id == comment.user_id %}
+                                                <button onclick="deleteComment({{ comment.id }}, '{{ post.id }}')" class="text-gray-600 hover:text-red-500 opacity-0 group-hover/item:opacity-100 transition">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                </button>
+                                                {% endif %}
+                                            </div>
+                                            <p class="text-sm mt-0.5 text-gray-400">{{ comment.content }}</p>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            </article>
-            {% endfor %}
-        </div>
-    </main>
+                </article>
+                {% endfor %}
+            </div>
+        </main>
 
-    <a href="{{ url_for('create_post') }}" class="fixed bottom-24 right-6 w-14 h-14 bg-sky-500 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-all z-40">
+        <!-- RIGHT: desktop-only panel -->
+        <aside class="hidden xl:flex xl:flex-col xl:w-80 xl:shrink-0 lg:h-screen lg:sticky lg:top-0 px-4 py-6 space-y-4">
+            {% if user %}
+            <a href="{{ url_for('user_profile', username=user.username) }}" class="desk-link flex items-center gap-3 p-4 rounded-2xl border border-gray-800 bg-gray-900/40">
+                <img src="{{ user.profile_pic if user.profile_pic else 'https://ui-avatars.com/api/?name=' + user.username }}" class="w-12 h-12 rounded-full object-cover border border-gray-800">
+                <div class="min-w-0">
+                    <p class="font-bold truncate">{{ user.username }}</p>
+                    <p class="text-sky-500 text-sm">View profile</p>
+                </div>
+            </a>
+            {% else %}
+            <div class="p-5 rounded-2xl border border-gray-800 bg-gray-900/40 space-y-3">
+                <p class="font-bold text-lg">New to SE7EN?</p>
+                <p class="text-sm text-gray-400">Sign up to like, comment, and post.</p>
+                <a href="{{ url_for('register') }}" class="block text-center bg-sky-500 hover:bg-sky-400 text-white font-bold py-2.5 rounded-full transition">Sign up</a>
+                <a href="{{ url_for('login') }}" class="block text-center border border-gray-700 hover:border-sky-500 text-gray-200 font-bold py-2.5 rounded-full transition">Login</a>
+            </div>
+            {% endif %}
+
+            <div class="p-5 rounded-2xl border border-gray-800 bg-gray-900/40">
+                <p class="brand-font text-sm text-brand-gradient font-black mb-1">SE7EN</p>
+                <p class="text-xs text-gray-500">Share moments, connect, and discover what people are experiencing right now.</p>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Mobile-only floating create button -->
+    <a href="{{ url_for('create_post') }}" class="lg:hidden fixed bottom-24 right-6 w-14 h-14 bg-sky-500 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-all z-40">
         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
     </a>
 
@@ -232,16 +302,17 @@
             }).then(res => res.json()).then(data => {
                 if (data.error) return window.location.href = "/login";
                 const list = document.getElementById(`comments-list-${postId}`);
+                const safe = (str) => String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
                 const html = `<div id="comment-${data.id}" class="flex gap-3 group/item comment-enter">
-                    <a href="/profile/${data.username}"><img src="${data.profile_pic}" class="w-8 h-8 rounded-full object-cover border border-gray-800"></a>
+                    <a href="/profile/${safe(data.username)}"><img src="${data.profile_pic}" class="w-8 h-8 rounded-full object-cover border border-gray-800"></a>
                     <div class="flex-1 bg-gray-900/50 p-3 rounded-2xl relative border border-gray-800">
                         <div class="flex justify-between items-start">
-                            <span class="font-bold text-xs text-gray-300">${data.username}</span>
+                            <span class="font-bold text-xs text-gray-300">${safe(data.username)}</span>
                             <button onclick="deleteComment(${data.id}, '${postId}')" class="text-gray-600 hover:text-red-500 transition">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             </button>
                         </div>
-                        <p class="text-sm mt-0.5 text-gray-400">${data.content}</p>
+                        <p class="text-sm mt-0.5 text-gray-400">${safe(data.content)}</p>
                     </div>
                 </div>`;
                 list.insertAdjacentHTML('afterbegin', html);
@@ -264,11 +335,11 @@
         }
 
         async function sharePost(title, url) {
-            try { 
-                await navigator.share({ title: title, url: window.location.origin + url }); 
-            } catch (err) { 
-                navigator.clipboard.writeText(window.location.origin + url); 
-                alert('Link copied! 📋'); 
+            try {
+                await navigator.share({ title: title, url: window.location.origin + url });
+            } catch (err) {
+                navigator.clipboard.writeText(window.location.origin + url);
+                alert('Link copied! 📋');
             }
         }
     </script>
