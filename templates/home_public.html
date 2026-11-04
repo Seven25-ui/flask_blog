@@ -72,7 +72,7 @@
             </div>
             <nav class="space-y-1">
                 <a href="{{ url_for('public_home') }}" class="flex items-center gap-4 p-3 hover:bg-gray-800 rounded-xl font-bold transition text-gray-300 hover:text-sky-500"><span>🏠</span> Home</a>
-                <a href="{{ url_for('public_home', tab='video') }}" class="flex items-center gap-4 p-3 hover:bg-gray-800 rounded-xl font-bold transition text-gray-300 hover:text-sky-500"><span>🎬</span> Videos</a>
+                <a href="{{ url_for('reels') }}" class="flex items-center gap-4 p-3 hover:bg-gray-800 rounded-xl font-bold transition text-gray-300 hover:text-sky-500"><span>🎬</span> Reels</a>
 
                 {% if user %}
                     <a href="{{ url_for('inbox') }}" class="flex items-center justify-between p-3 hover:bg-gray-800 rounded-xl font-bold transition text-gray-300 hover:text-sky-500">
@@ -107,7 +107,7 @@
 
             <nav class="flex-1 space-y-1">
                 <a href="{{ url_for('public_home') }}" class="desk-link flex items-center gap-4 px-3 py-3 rounded-xl font-bold text-gray-200"><span class="text-xl">🏠</span> <span>Home</span></a>
-                <a href="{{ url_for('public_home', tab='video') }}" class="desk-link flex items-center gap-4 px-3 py-3 rounded-xl font-bold text-gray-200"><span class="text-xl">🎬</span> <span>Videos</span></a>
+                <a href="{{ url_for('reels') }}" class="desk-link flex items-center gap-4 px-3 py-3 rounded-xl font-bold text-gray-200"><span class="text-xl">🎬</span> <span>Reels</span></a>
 
                 {% if user %}
                     <a href="{{ url_for('inbox') }}" class="desk-link flex items-center justify-between px-3 py-3 rounded-xl font-bold text-gray-200">
@@ -286,7 +286,7 @@
     <nav class="bottom-nav lg:hidden fixed bottom-0 inset-x-0 z-40 bg-black/90 backdrop-blur-xl border-t border-gray-800">
         <div class="max-w-2xl mx-auto h-16 grid grid-cols-5 items-center text-center text-[11px] font-bold">
             <a href="{{ url_for('public_home') }}" class="flex flex-col items-center gap-0.5 {{ 'text-sky-500' if tab == 'discover' or tab == 'following' else 'text-gray-500' }}"><span class="text-xl leading-none">🏠</span>Home</a>
-            <a href="{{ url_for('public_home', tab='video') }}" class="flex flex-col items-center gap-0.5 {{ 'text-sky-500' if tab == 'video' else 'text-gray-500' }}"><span class="text-xl leading-none">🎬</span>Videos</a>
+            <a href="{{ url_for('reels') }}" class="flex flex-col items-center gap-0.5 text-gray-500"><span class="text-xl leading-none">🎬</span>Reels</a>
             {% if user %}
             <a href="{{ url_for('create_post') }}" aria-label="Create post" class="flex justify-center"><span class="w-12 h-12 -mt-5 bg-sky-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-sky-500/30 active:scale-95 transition">
                 <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg></span></a>
