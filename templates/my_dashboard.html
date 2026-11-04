@@ -201,7 +201,7 @@
 <nav class="bottom-nav lg:hidden fixed bottom-0 inset-x-0 z-40 bg-black/90 backdrop-blur-xl border-t border-gray-800">
     <div class="max-w-2xl mx-auto h-16 grid grid-cols-5 items-center text-center text-[11px] font-bold">
         <a href="{{ url_for('public_home') }}" class="flex flex-col items-center gap-0.5 text-gray-500"><span class="text-xl leading-none">🏠</span>Home</a>
-        <a href="{{ url_for('public_home', tab='video') }}" class="flex flex-col items-center gap-0.5 text-gray-500"><span class="text-xl leading-none">🎬</span>Videos</a>
+        <a href="{{ url_for('reels') }}" class="flex flex-col items-center gap-0.5 text-gray-500"><span class="text-xl leading-none">🎬</span>Reels</a>
         <a href="{{ url_for('create_post') }}" aria-label="Create post" class="flex justify-center"><span class="w-12 h-12 -mt-5 bg-sky-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-sky-500/30 active:scale-95 transition">
             <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg></span></a>
         <a href="{{ url_for('inbox') }}" class="relative flex flex-col items-center gap-0.5 text-gray-500"><span class="text-xl leading-none">💬</span>Chat
