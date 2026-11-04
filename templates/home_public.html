@@ -8,12 +8,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Orbitron:wght@900&display=swap" rel="stylesheet">
     <style>
         :root { --bg-deep: #000000; --sky-accent: #0ea5e9; }
-        body { background-color: var(--bg-deep); color: #f1f5f9; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--bg-deep); color: #f1f5f9; font-family: 'Inter', sans-serif; overflow-x: hidden; }
 
         @keyframes brandPulse {
-            0% { transform: scale(1); filter: drop-shadow(0 0 0px rgba(14, 165, 233, 0)); }
+            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0px rgba(14, 165, 233, 0)); }
             50% { transform: scale(1.05); filter: drop-shadow(0 0 10px rgba(14, 165, 233, 0.6)); }
-            100% { transform: scale(1); filter: drop-shadow(0 0 0px rgba(14, 165, 233, 0)); }
         }
         .animate-pulse-brand { animation: brandPulse 3s infinite ease-in-out; display: inline-block; }
         .brand-font { font-family: 'Orbitron', sans-serif; letter-spacing: 0.15em; }
@@ -24,35 +23,36 @@
 
         .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
-        /* Animation for side menu badge */
-        @keyframes pulse-red {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
+        @keyframes pulse-red { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
         .notif-pulse { animation: pulse-red 2s infinite; }
 
-        /* Desktop nav link active state helper */
         .desk-link { transition: all .15s ease; }
         .desk-link:hover { background: rgba(255,255,255,0.05); }
+
+        .bottom-nav { padding-bottom: env(safe-area-inset-bottom); }
+        @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
     </style>
 </head>
 <body class="selection:bg-sky-500/30">
 
+    {# Fallback para sa avatar #}
+    {% macro avatar(u, name) -%}{{ u.profile_pic if u and u.profile_pic else 'https://ui-avatars.com/api/?name=' + name }}{%- endmacro %}
+
     <!-- Mobile-only top bar -->
     <nav class="lg:hidden sticky top-0 z-50 bg-black/80 backdrop-blur-xl border-b border-gray-800">
         <div class="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
-            <button onclick="toggleMenu()" class="p-2.5 hover:bg-gray-800 rounded-xl transition-all active:scale-90">
+            <button onclick="toggleMenu()" aria-label="Open menu" class="p-2.5 hover:bg-gray-800 rounded-xl transition-all active:scale-90">
                 <svg class="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 12h10M4 18h16"/></svg>
             </button>
-            <div class="flex flex-col items-center">
+            <a href="{{ url_for('public_home') }}" class="flex flex-col items-center">
                 <span class="brand-font text-2xl font-black text-brand-gradient italic animate-pulse-brand">SE7EN</span>
                 <div class="h-0.5 w-10 bg-sky-500 rounded-full -mt-1 opacity-50"></div>
-            </div>
+            </a>
             <div class="w-10 flex justify-end">
                 {% if user %}
-                <a href="{{ url_for('profile_settings') }}" class="relative group">
+                <a href="{{ url_for('user_profile', username=user.username) }}" class="relative group">
                     <div class="absolute -inset-0.5 bg-sky-500 rounded-full opacity-20 group-hover:opacity-100 transition blur"></div>
-                    <img src="{{ user.profile_pic if user.profile_pic else 'https://ui-avatars.com/api/?name=' + user.username }}" class="relative w-9 h-9 rounded-full border border-gray-700 object-cover shadow-sm">
+                    <img src="{{ avatar(user, user.username) }}" alt="" class="relative w-9 h-9 rounded-full border border-gray-700 object-cover shadow-sm">
                 </a>
                 {% else %}
                 <a href="{{ url_for('login') }}" class="text-sky-500 hover:text-sky-400 transition font-bold text-sm">Login</a>
@@ -68,23 +68,20 @@
         <div class="p-6 space-y-2">
             <div class="mb-8 flex items-center justify-between border-b border-gray-800 pb-4">
                 <h2 class="brand-font text-xl font-black text-brand-gradient italic">SE7EN</h2>
-                <button onclick="toggleMenu()" class="text-gray-500 hover:text-sky-500">✕</button>
+                <button onclick="toggleMenu()" aria-label="Close menu" class="text-gray-500 hover:text-sky-500">✕</button>
             </div>
             <nav class="space-y-1">
-                <a href="/" class="flex items-center gap-4 p-3 hover:bg-gray-800 rounded-xl font-bold transition text-gray-300 hover:text-sky-500"><span>🏠</span> Home</a>
+                <a href="{{ url_for('public_home') }}" class="flex items-center gap-4 p-3 hover:bg-gray-800 rounded-xl font-bold transition text-gray-300 hover:text-sky-500"><span>🏠</span> Home</a>
+                <a href="{{ url_for('public_home', tab='video') }}" class="flex items-center gap-4 p-3 hover:bg-gray-800 rounded-xl font-bold transition text-gray-300 hover:text-sky-500"><span>🎬</span> Videos</a>
 
                 {% if user %}
                     <a href="{{ url_for('inbox') }}" class="flex items-center justify-between p-3 hover:bg-gray-800 rounded-xl font-bold transition text-gray-300 hover:text-sky-500">
-                        <div class="flex items-center gap-4">
-                            <span>💬</span> Messages
-                        </div>
-                        {% if notification_count and notification_count > 0 %}
-                        <span class="bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full notif-pulse">
-                            {{ notification_count }}
-                        </span>
+                        <div class="flex items-center gap-4"><span>💬</span> Messages</div>
+                        {% if unread_count and unread_count > 0 %}
+                        <span class="bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full notif-pulse">{{ unread_count }}</span>
                         {% endif %}
                     </a>
-
+                    <a href="{{ url_for('notifications') }}" class="flex items-center gap-4 p-3 hover:bg-gray-800 rounded-xl font-bold transition text-gray-300 hover:text-sky-500"><span>🔔</span> Notifications</a>
                     <a href="{{ url_for('dashboard') }}" class="flex items-center gap-4 p-3 hover:bg-gray-800 rounded-xl font-bold transition text-gray-300"><span>📊</span> Dashboard</a>
                     <a href="{{ url_for('user_profile', username=user.username) }}" class="flex items-center gap-4 p-3 hover:bg-gray-800 rounded-xl font-bold transition text-gray-300"><span>👤</span> Profile</a>
                     <a href="{{ url_for('profile_settings') }}" class="flex items-center gap-4 p-3 hover:bg-gray-800 rounded-xl font-bold transition border-t border-gray-800 mt-2 pt-4 text-gray-300"><span>⚙️</span> Settings</a>
@@ -102,21 +99,26 @@
     <!-- Desktop 3-column shell -->
     <div class="lg:flex lg:w-full lg:max-w-[1280px] lg:mx-auto">
 
-        <!-- LEFT: persistent desktop sidebar -->
+        <!-- LEFT: desktop sidebar -->
         <aside class="hidden lg:flex lg:flex-col lg:w-64 xl:w-72 lg:h-screen lg:sticky lg:top-0 lg:shrink-0 border-r border-gray-800 px-4 py-6">
-            <a href="/" class="flex items-center gap-2 px-2 mb-8">
+            <a href="{{ url_for('public_home') }}" class="flex items-center gap-2 px-2 mb-8">
                 <span class="brand-font text-2xl font-black text-brand-gradient italic animate-pulse-brand">SE7EN</span>
             </a>
 
             <nav class="flex-1 space-y-1">
-                <a href="/" class="desk-link flex items-center gap-4 px-3 py-3 rounded-xl font-bold text-gray-200"><span class="text-xl">🏠</span> <span>Home</span></a>
+                <a href="{{ url_for('public_home') }}" class="desk-link flex items-center gap-4 px-3 py-3 rounded-xl font-bold text-gray-200"><span class="text-xl">🏠</span> <span>Home</span></a>
+                <a href="{{ url_for('public_home', tab='video') }}" class="desk-link flex items-center gap-4 px-3 py-3 rounded-xl font-bold text-gray-200"><span class="text-xl">🎬</span> <span>Videos</span></a>
 
                 {% if user %}
                     <a href="{{ url_for('inbox') }}" class="desk-link flex items-center justify-between px-3 py-3 rounded-xl font-bold text-gray-200">
                         <div class="flex items-center gap-4"><span class="text-xl">💬</span> <span>Messages</span></div>
-                        {% if notification_count and notification_count > 0 %}
-                        <span class="bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full notif-pulse">{{ notification_count }}</span>
+                        {% if unread_count and unread_count > 0 %}
+                        <span class="bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full notif-pulse">{{ unread_count }}</span>
                         {% endif %}
+                    </a>
+                    <a href="{{ url_for('notifications') }}" class="desk-link flex items-center justify-between px-3 py-3 rounded-xl font-bold text-gray-200">
+                        <div class="flex items-center gap-4"><span class="text-xl">🔔</span> <span>Notifications</span></div>
+                        <span id="notif-badge-desktop" class="hidden w-2.5 h-2.5 rounded-full bg-sky-500"></span>
                     </a>
                     <a href="{{ url_for('dashboard') }}" class="desk-link flex items-center gap-4 px-3 py-3 rounded-xl font-bold text-gray-200"><span class="text-xl">📊</span> <span>Dashboard</span></a>
                     <a href="{{ url_for('user_profile', username=user.username) }}" class="desk-link flex items-center gap-4 px-3 py-3 rounded-xl font-bold text-gray-200"><span class="text-xl">👤</span> <span>Profile</span></a>
@@ -128,22 +130,24 @@
             </nav>
 
             {% if user %}
-            <a href="{{ url_for('create_post') }}" class="w-full text-center bg-sky-500 hover:bg-sky-400 text-white font-bold py-3 rounded-full transition shadow-lg shadow-sky-500/20 mb-4">
-                + Create Post
-            </a>
+            <a href="{{ url_for('create_post') }}" class="w-full text-center bg-sky-500 hover:bg-sky-400 text-white font-bold py-3 rounded-full transition shadow-lg shadow-sky-500/20 mb-4">+ Create Post</a>
             <a href="{{ url_for('logout') }}" class="desk-link flex items-center gap-4 px-3 py-3 rounded-xl font-bold text-red-500"><span class="text-xl">🚪</span> <span>Logout</span></a>
             {% endif %}
         </aside>
 
         <!-- CENTER: feed -->
-        <main class="w-full lg:max-w-2xl min-h-screen border-x border-gray-800 pb-24 bg-black">
+        <main class="w-full lg:max-w-2xl min-h-screen border-x border-gray-800 pb-28 lg:pb-24 bg-black">
             <div class="flex border-b border-gray-800 sticky top-16 lg:top-0 bg-black/90 backdrop-blur-md z-30">
-                <a href="{{ url_for('public_home', tab='discover') }}" class="flex-1 py-4 text-center relative {{ 'font-bold text-sky-500' if active_tab == 'discover' or not active_tab else 'text-gray-500' }}">
-                    Discover {% if active_tab == 'discover' or not active_tab %}<div class="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-sky-500 rounded-full"></div>{% endif %}
+                {% set tab = active_tab or 'discover' %}
+                <a href="{{ url_for('public_home', tab='discover') }}" class="flex-1 py-4 text-center relative {{ 'font-bold text-sky-500' if tab == 'discover' else 'text-gray-500' }}">
+                    Discover {% if tab == 'discover' %}<div class="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-sky-500 rounded-full"></div>{% endif %}
+                </a>
+                <a href="{{ url_for('public_home', tab='video') }}" class="flex-1 py-4 text-center relative {{ 'font-bold text-sky-500' if tab == 'video' else 'text-gray-500' }}">
+                    Videos {% if tab == 'video' %}<div class="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-sky-500 rounded-full"></div>{% endif %}
                 </a>
                 {% if user %}
-                <a href="{{ url_for('public_home', tab='following') }}" class="flex-1 py-4 text-center relative {{ 'font-bold text-sky-500' if active_tab == 'following' else 'text-gray-500' }}">
-                    Following {% if active_tab == 'following' %}<div class="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-sky-500 rounded-full"></div>{% endif %}
+                <a href="{{ url_for('public_home', tab='following') }}" class="flex-1 py-4 text-center relative {{ 'font-bold text-sky-500' if tab == 'following' else 'text-gray-500' }}">
+                    Following {% if tab == 'following' %}<div class="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-sky-500 rounded-full"></div>{% endif %}
                 </a>
                 {% endif %}
             </div>
@@ -155,23 +159,23 @@
                         <div class="flex-shrink-0">
                             {% set p_user = get_user_by_username(post.author) %}
                             <a href="{{ url_for('user_profile', username=post.author) }}">
-                                <img src="{{ p_user.profile_pic if p_user and p_user.profile_pic else 'https://ui-avatars.com/api/?name=' + post.author }}" class="w-12 h-12 rounded-full object-cover border border-gray-800">
+                                <img src="{{ avatar(p_user, post.author) }}" alt="" class="w-12 h-12 rounded-full object-cover border border-gray-800" loading="lazy">
                             </a>
                         </div>
                         <div class="flex-1 min-w-0">
                             <div class="flex justify-between items-start mb-1">
-                                <div class="flex items-center gap-1">
-                                    <a href="{{ url_for('user_profile', username=post.author) }}" class="font-bold hover:text-sky-500 transition">{{ post.author }}</a>
-                                    <span class="text-gray-600 text-sm">· {{ time_ago(post.created_at) }}</span>
+                                <div class="flex items-center gap-1 min-w-0">
+                                    <a href="{{ url_for('user_profile', username=post.author) }}" class="font-bold hover:text-sky-500 transition truncate">{{ post.author }}</a>
+                                    <span class="text-gray-600 text-sm whitespace-nowrap">· {{ time_ago(post.created_at) }}</span>
                                 </div>
-                                {% if user and user.username == post.author %}
+                                {% if user and (user.username == post.author or user.is_admin) %}
                                 <form action="{{ url_for('delete_post', post_id=post.id) }}" method="POST" onsubmit="return confirm('Delete post?');">
-                                    <button type="submit" class="text-gray-600 hover:text-red-500 transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                                    <button type="submit" aria-label="Delete post" class="text-gray-600 hover:text-red-500 transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                                 </form>
                                 {% endif %}
                             </div>
 
-                            <a href="/post/{{ post.slug }}" class="block pr-6">
+                            <a href="{{ url_for('view_post', slug=post.slug) }}" class="block pr-6">
                                 <h2 class="text-lg font-bold text-gray-100 hover:text-sky-400 mb-1 transition">{{ post.title }}</h2>
                                 <p class="text-gray-400 text-sm line-clamp-3 mb-3">{{ post.content | striptags }}</p>
                             </a>
@@ -179,53 +183,54 @@
                             {% if post.media_file %}
                             <div class="rounded-2xl overflow-hidden border border-gray-800 mb-3">
                                 {% if post.media_type == 'video' %}
-                                <video class="w-full max-h-96 object-contain bg-black" src="{{ post.media_file }}" controls></video>
+                                <video class="w-full max-h-96 object-contain bg-black" src="{{ post.media_file }}" controls preload="metadata" playsinline></video>
                                 {% else %}
-                                <img src="{{ post.media_file }}" class="w-full max-h-96 object-cover" loading="lazy">
+                                <img src="{{ post.media_file }}" alt="" class="w-full max-h-96 object-cover" loading="lazy">
                                 {% endif %}
                             </div>
                             {% endif %}
 
                             <div class="flex justify-between max-w-sm text-gray-500">
-                                <button onclick="toggleComments('{{ post.id }}')" class="hover:text-sky-500 transition flex items-center gap-2 group/btn">
+                                <button onclick="toggleComments('{{ post.id }}')" aria-label="Comments" class="hover:text-sky-500 transition flex items-center gap-2 group/btn">
                                     <span class="p-2 group-hover/btn:bg-sky-500/10 rounded-full">💬</span>
                                     <span id="comment-count-{{ post.id }}">{{ get_comment_count(post.id) }}</span>
                                 </button>
-                                <button onclick="handleLike('{{ post.id }}')" id="like-btn-{{ post.id }}" class="flex items-center gap-2 group/btn {{ 'text-pink-500' if user and user_has_liked(user.id, post.id) }}">
-                                    <span class="p-2 group-hover/btn:bg-pink-500/10 rounded-full" id="like-icon-{{ post.id }}">
-                                        {{ '❤️' if user and user_has_liked(user.id, post.id) else '♡' }}
-                                    </span>
+                                {% set liked = user and user_has_liked(user.id, post.id) %}
+                                <button onclick="handleLike('{{ post.id }}')" id="like-btn-{{ post.id }}" aria-label="Like" class="flex items-center gap-2 group/btn {{ 'text-pink-500' if liked }}">
+                                    <span class="p-2 group-hover/btn:bg-pink-500/10 rounded-full" id="like-icon-{{ post.id }}">{{ '❤️' if liked else '♡' }}</span>
                                     <span id="like-count-{{ post.id }}">{{ get_like_count(post.id) }}</span>
                                 </button>
-                                <button onclick="sharePost('{{ post.title }}', '/post/{{ post.slug }}')" class="p-2 hover:text-sky-500">🔗</button>
+                                <button onclick='sharePost({{ post.title|tojson }}, {{ ("/post/" ~ post.slug)|tojson }})' aria-label="Share" class="p-2 hover:text-sky-500">🔗</button>
                             </div>
 
                             <div id="comment-box-{{ post.id }}" class="hidden mt-4 pt-4 border-t border-gray-800">
                                 {% if user %}
                                 <div class="flex gap-2 mb-4">
-                                    <img src="{{ user.profile_pic if user.profile_pic else 'https://ui-avatars.com/api/?name=' + user.username }}" class="w-8 h-8 rounded-full">
+                                    <img src="{{ avatar(user, user.username) }}" alt="" class="w-8 h-8 rounded-full object-cover">
                                     <div class="flex-1 relative">
-                                        <input type="text" id="comment-input-{{ post.id }}" class="w-full bg-gray-900 border border-gray-800 rounded-full px-4 py-2 text-sm focus:ring-1 focus:ring-sky-500 outline-none" placeholder="Reply...">
+                                        <input type="text" id="comment-input-{{ post.id }}" maxlength="500" onkeydown="if(event.key==='Enter')submitComment('{{ post.id }}')" class="w-full bg-gray-900 border border-gray-800 rounded-full pl-4 pr-14 py-2 text-sm focus:ring-1 focus:ring-sky-500 outline-none" placeholder="Reply...">
                                         <button onclick="submitComment('{{ post.id }}')" class="absolute right-3 top-1/2 -translate-y-1/2 text-sky-500 font-bold text-sm">Post</button>
                                     </div>
                                 </div>
+                                {% else %}
+                                <p class="text-sm text-gray-500 mb-4"><a href="{{ url_for('login') }}" class="text-sky-500 font-bold">Login</a> to join the conversation.</p>
                                 {% endif %}
                                 <div id="comments-list-{{ post.id }}" class="space-y-4">
                                     {% for comment in get_comments_for_post(post.id) %}
                                     <div id="comment-{{ comment.id }}" class="flex gap-3 group/item">
                                         <a href="{{ url_for('user_profile', username=comment.user.username) }}">
-                                            <img src="{{ comment.user.profile_pic if comment.user.profile_pic else 'https://ui-avatars.com/api/?name=' + comment.user.username }}" class="w-8 h-8 rounded-full object-cover">
+                                            <img src="{{ avatar(comment.user, comment.user.username) }}" alt="" class="w-8 h-8 rounded-full object-cover">
                                         </a>
                                         <div class="flex-1 bg-gray-900/50 p-3 rounded-2xl relative border border-gray-800">
                                             <div class="flex justify-between items-start">
                                                 <a href="{{ url_for('user_profile', username=comment.user.username) }}" class="font-bold text-xs hover:underline text-gray-300">{{ comment.user.username }}</a>
-                                                {% if user and user.id == comment.user_id %}
-                                                <button onclick="deleteComment({{ comment.id }}, '{{ post.id }}')" class="text-gray-600 hover:text-red-500 opacity-0 group-hover/item:opacity-100 transition">
+                                                {% if user and (user.id == comment.user_id or user.is_admin) %}
+                                                <button onclick="deleteComment({{ comment.id }}, '{{ post.id }}')" aria-label="Delete comment" class="text-gray-600 hover:text-red-500 lg:opacity-0 group-hover/item:opacity-100 transition">
                                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                                 </button>
                                                 {% endif %}
                                             </div>
-                                            <p class="text-sm mt-0.5 text-gray-400">{{ comment.content }}</p>
+                                            <p class="text-sm mt-0.5 text-gray-400 break-words">{{ comment.content }}</p>
                                         </div>
                                     </div>
                                     {% endfor %}
@@ -234,6 +239,19 @@
                         </div>
                     </div>
                 </article>
+                {% else %}
+                <div class="p-16 text-center text-gray-500">
+                    {% if tab == 'following' %}
+                        <p class="font-bold text-gray-300 mb-1">Wala pa kay gi-follow</p>
+                        <p class="text-sm">Pangita ug mga tawo sa Discover, unya i-follow sila para makita ang ilang posts diri.</p>
+                    {% elif tab == 'video' %}
+                        <p class="font-bold text-gray-300 mb-1">Wala pay videos</p>
+                        <p class="text-sm">Mag-post ug video para mauna ka.</p>
+                    {% else %}
+                        <p class="font-bold text-gray-300 mb-1">Wala pay posts</p>
+                        <p class="text-sm">Ikaw ang mag-una.</p>
+                    {% endif %}
+                </div>
                 {% endfor %}
             </div>
         </main>
@@ -242,7 +260,7 @@
         <aside class="hidden xl:flex xl:flex-col xl:w-80 xl:shrink-0 lg:h-screen lg:sticky lg:top-0 px-4 py-6 space-y-4">
             {% if user %}
             <a href="{{ url_for('user_profile', username=user.username) }}" class="desk-link flex items-center gap-3 p-4 rounded-2xl border border-gray-800 bg-gray-900/40">
-                <img src="{{ user.profile_pic if user.profile_pic else 'https://ui-avatars.com/api/?name=' + user.username }}" class="w-12 h-12 rounded-full object-cover border border-gray-800">
+                <img src="{{ avatar(user, user.username) }}" alt="" class="w-12 h-12 rounded-full object-cover border border-gray-800">
                 <div class="min-w-0">
                     <p class="font-bold truncate">{{ user.username }}</p>
                     <p class="text-sky-500 text-sm">View profile</p>
@@ -264,10 +282,45 @@
         </aside>
     </div>
 
-    <!-- Mobile-only floating create button -->
-    <a href="{{ url_for('create_post') }}" class="lg:hidden fixed bottom-24 right-6 w-14 h-14 bg-sky-500 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-all z-40">
-        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-    </a>
+    <!-- Mobile bottom nav -->
+    <nav class="bottom-nav lg:hidden fixed bottom-0 inset-x-0 z-40 bg-black/90 backdrop-blur-xl border-t border-gray-800">
+        <div class="max-w-2xl mx-auto h-16 grid grid-cols-5 items-center text-center text-[11px] font-bold">
+            <a href="{{ url_for('public_home') }}" class="flex flex-col items-center gap-0.5 {{ 'text-sky-500' if tab == 'discover' or tab == 'following' else 'text-gray-500' }}"><span class="text-xl leading-none">🏠</span>Home</a>
+            <a href="{{ url_for('public_home', tab='video') }}" class="flex flex-col items-center gap-0.5 {{ 'text-sky-500' if tab == 'video' else 'text-gray-500' }}"><span class="text-xl leading-none">🎬</span>Videos</a>
+            {% if user %}
+            <a href="{{ url_for('create_post') }}" aria-label="Create post" class="flex justify-center"><span class="w-12 h-12 -mt-5 bg-sky-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-sky-500/30 active:scale-95 transition">
+                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg></span></a>
+            <a href="{{ url_for('inbox') }}" class="relative flex flex-col items-center gap-0.5 text-gray-500"><span class="text-xl leading-none">💬</span>Chat
+                {% if unread_count and unread_count > 0 %}<span class="absolute top-0 right-5 bg-red-600 text-white text-[9px] px-1.5 rounded-full">{{ unread_count }}</span>{% endif %}
+            </a>
+            <a href="{{ url_for('user_profile', username=user.username) }}" class="flex flex-col items-center gap-0.5 text-gray-500"><span class="text-xl leading-none">👤</span>Profile</a>
+            {% else %}
+            <a href="{{ url_for('register') }}" class="col-span-1 flex flex-col items-center gap-0.5 text-gray-500"><span class="text-xl leading-none">📝</span>Sign up</a>
+            <a href="{{ url_for('login') }}" class="col-span-2 mx-3 bg-sky-500 text-white rounded-full py-2.5 text-sm">Login</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    {% if user %}
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+        socket.on('notify', (data) => {
+            document.getElementById('notif-badge-desktop')?.classList.remove('hidden');
+            showToast(data.message);
+        });
+        function showToast(msg) {
+            const t = document.createElement('div');
+            t.className = "fixed bottom-24 lg:bottom-10 left-1/2 -translate-x-1/2 z-[200] px-6 py-4 bg-black border-2 border-sky-500 rounded-2xl shadow-2xl";
+            const p = document.createElement('p');
+            p.className = "text-sm text-sky-400 font-bold";
+            p.textContent = msg;   // textContent, dili innerHTML (safe sa XSS)
+            t.appendChild(p);
+            document.body.appendChild(t);
+            setTimeout(() => t.remove(), 4000);
+        }
+    </script>
+    {% endif %}
 
     <script>
         function toggleMenu() {
@@ -282,14 +335,16 @@
         function handleLike(postId) {
             fetch(`/like/${postId}`, { method: 'POST' })
                 .then(res => res.json()).then(data => {
-                    if(data.error) return window.location.href = "/login";
+                    if (data.error) return window.location.href = "/login";
                     document.getElementById(`like-count-${postId}`).innerText = data.count;
                     const icon = document.getElementById(`like-icon-${postId}`);
                     const btn = document.getElementById(`like-btn-${postId}`);
-                    if(data.liked) { icon.innerText = "❤️"; btn.classList.add('text-pink-500'); }
+                    if (data.liked) { icon.innerText = "❤️"; btn.classList.add('text-pink-500'); }
                     else { icon.innerText = "♡"; btn.classList.remove('text-pink-500'); }
                 });
         }
+
+        const safe = (str) => String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
         function submitComment(postId) {
             const input = document.getElementById(`comment-input-${postId}`);
@@ -302,17 +357,16 @@
             }).then(res => res.json()).then(data => {
                 if (data.error) return window.location.href = "/login";
                 const list = document.getElementById(`comments-list-${postId}`);
-                const safe = (str) => String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
                 const html = `<div id="comment-${data.id}" class="flex gap-3 group/item comment-enter">
-                    <a href="/profile/${safe(data.username)}"><img src="${data.profile_pic}" class="w-8 h-8 rounded-full object-cover border border-gray-800"></a>
+                    <a href="/user/${encodeURIComponent(data.username)}"><img src="${safe(data.profile_pic)}" alt="" class="w-8 h-8 rounded-full object-cover border border-gray-800"></a>
                     <div class="flex-1 bg-gray-900/50 p-3 rounded-2xl relative border border-gray-800">
                         <div class="flex justify-between items-start">
-                            <span class="font-bold text-xs text-gray-300">${safe(data.username)}</span>
-                            <button onclick="deleteComment(${data.id}, '${postId}')" class="text-gray-600 hover:text-red-500 transition">
+                            <a href="/user/${encodeURIComponent(data.username)}" class="font-bold text-xs hover:underline text-gray-300">${safe(data.username)}</a>
+                            <button onclick="deleteComment(${Number(data.id)}, '${postId}')" aria-label="Delete comment" class="text-gray-600 hover:text-red-500 transition">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             </button>
                         </div>
-                        <p class="text-sm mt-0.5 text-gray-400">${safe(data.content)}</p>
+                        <p class="text-sm mt-0.5 text-gray-400 break-words">${safe(data.content)}</p>
                     </div>
                 </div>`;
                 list.insertAdjacentHTML('afterbegin', html);
@@ -335,11 +389,11 @@
         }
 
         async function sharePost(title, url) {
+            const full = window.location.origin + url;
             try {
-                await navigator.share({ title: title, url: window.location.origin + url });
+                await navigator.share({ title: title, url: full });
             } catch (err) {
-                navigator.clipboard.writeText(window.location.origin + url);
-                alert('Link copied! 📋');
+                try { await navigator.clipboard.writeText(full); alert('Link copied! 📋'); } catch (e) { prompt('Copy link:', full); }
             }
         }
     </script>
