@@ -1,45 +1,75 @@
-from flask import Flask, render_template, redirect, url_for, request, session, flash, jsonify, send_from_directory
+from flask import (Flask, render_template, redirect, url_for, request, session,
+                   flash, jsonify, send_from_directory)
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import re
-from datetime import datetime, timedelta  # Gidugang ang timedelta
+from datetime import datetime, timedelta
 from functools import wraps
 import cloudinary
 import cloudinary.uploader
-from cloudinary.uploader import upload
-# --- MGA BAG-ONG IMPORTS ---
-from flask_socketio import SocketIO, emit, join_room
-import eventlet
+from flask_socketio import SocketIO, join_room
+import eventlet  # gikinahanglan sa async_mode='eventlet'
 
-# --- IMONG EXISTING APP CONFIG ---
+# Para lang sa local nga pagtrabaho (.env file). Sa Render, Environment Variables ang gamit.
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+
+# --------------------------------------------------------------------------
+# 0. CONFIG (tanang secrets gikan na sa environment variables)
+# --------------------------------------------------------------------------
+def require_env(name):
+    value = os.environ.get(name)
+    if not value:
+        raise RuntimeError(f"Missing environment variable: {name}")
+    return value
+
+
 app = Flask(__name__)
-app.secret_key = "aloy_super_secret_key_733"
+app.secret_key = require_env("SECRET_KEY")
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024          # 100 MB max upload
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'                 # panalipod sa CSRF
+app.config['SESSION_COOKIE_SECURE'] = bool(os.environ.get("RENDER"))
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 
-# --- I-INITIALIZE ANG SOCKETIO ---
-# Importante ang async_mode='eventlet' para sa Render Free Tier
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
-# --- HELPER PARA SA PILIPINAS TIME (UTC+8) ---
+# SocketIO (eventlet para sa Render). Pwede nimo i-limit ang origin: ALLOWED_ORIGINS=https://flask-blog-v2.onrender.com
+socketio = SocketIO(app,
+                    cors_allowed_origins=os.environ.get("ALLOWED_ORIGINS", "*"),
+                    async_mode='eventlet')
+
+
 def ph_time():
+    """Oras sa Pilipinas (UTC+8)."""
     return datetime.utcnow() + timedelta(hours=8)
 
-# --- 1. CONFIG ---
+
 cloudinary.config(
-    cloud_name = "dzwn8b3ax",
-    api_key = "179391797818159",
-    api_secret = "DfNDDAsqR2dAy4KH8sZa2_P7x2g",
-    secure = True
+    cloud_name=require_env("CLOUDINARY_CLOUD_NAME"),
+    api_key=require_env("CLOUDINARY_API_KEY"),
+    api_secret=require_env("CLOUDINARY_API_SECRET"),
+    secure=True
 )
 
-raw_url = "postgresql://neondb_owner:npg_kqEm6hxCyWj2@ep-fragrant-moon-a18v84gz-pooler.ap-southeast-1.aws.neon.tech/neondb"
-def fix_uri(uri):
-    return uri.replace("postgres://", "postgresql+pg8000://", 1).replace("postgresql://", "postgresql+pg8000://", 1)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = fix_uri(raw_url)
+def fix_uri(uri):
+    return (uri.replace("postgres://", "postgresql+pg8000://", 1)
+               .replace("postgresql://", "postgresql+pg8000://", 1))
+
+
+app.config['SQLALCHEMY_DATABASE_URI'] = fix_uri(require_env("DATABASE_URL"))
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {"pool_pre_ping": True, "pool_recycle": 280}
 db = SQLAlchemy(app)
 
-# --- 2. MODELS ---
+
+# --------------------------------------------------------------------------
+# 1. MODELS
+# --------------------------------------------------------------------------
 class User(db.Model):
     __table_args__ = {'extend_existing': True}
     id = db.Column(db.Integer, primary_key=True)
@@ -50,7 +80,8 @@ class User(db.Model):
     profile_pic = db.Column(db.String(500), default='https://res.cloudinary.com/demo/image/upload/v1/avatar.png')
     background_pic = db.Column(db.String(500), default='https://res.cloudinary.com/demo/image/upload/v1/sample.jpg')
     created_at = db.Column(db.DateTime, default=ph_time)
-    last_seen = db.Column(db.DateTime, default=ph_time) # Gidugang para sa Online Status
+    last_seen = db.Column(db.DateTime, default=ph_time)
+
 
 class Post(db.Model):
     __table_args__ = {'extend_existing': True}
@@ -66,16 +97,11 @@ class Post(db.Model):
     media_file = db.Column(db.String(500), nullable=True)
     media_type = db.Column(db.String(10), nullable=True)
 
-    # --- KINI ANG MO-FIX SA TANANG DELETE ERRORS ---
-    
-    # Inig delete sa Post, ma-delete sab ang tanang LIKES
+    # Inig delete sa Post, ma-delete sab ang likes, comments, notifications
     likes = db.relationship('Like', backref='post', cascade="all, delete-orphan", lazy=True)
-
-    # Inig delete sa Post, ma-delete sab ang tanang COMMENTS
     comments = db.relationship('Comment', backref='post', cascade="all, delete-orphan", lazy=True)
-
-    # MAO NI ANG IMPORTANTE PARA SA NOTIFICATIONS (Gi-uncomment nako)
     notifications = db.relationship('Notification', backref='post', cascade="all, delete-orphan", lazy=True)
+
 
 class Reaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -83,10 +109,12 @@ class Reaction(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     type = db.Column(db.String(20), default='like')
 
+
 class Like(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=False)
+
 
 class Comment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -96,61 +124,133 @@ class Comment(db.Model):
     created_at = db.Column(db.DateTime, default=ph_time)
     user = db.relationship('User', backref='user_comments')
 
+
 class Follow(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     follower_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     followed_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=ph_time)
 
+
 class Message(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     sender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     receiver_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     content = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, default=ph_time) # Pabilin ang PH time
+    created_at = db.Column(db.DateTime, default=ph_time)
     is_read = db.Column(db.Boolean, default=False)
-    
-    # 1. DUGANG: Parent ID para sa Reply link
     parent_id = db.Column(db.Integer, db.ForeignKey('message.id'), nullable=True)
-    
-    # Existing relationships
+
     sender = db.relationship('User', foreign_keys=[sender_id], backref='sent_messages')
     receiver = db.relationship('User', foreign_keys=[receiver_id], backref='received_messages')
-    
-    # 2. DUGANG: Relationship para makuha ang content sa gi-replyan
     parent_message = db.relationship('Message', remote_side=[id], backref='replies')
     reaction = db.Column(db.String(20), nullable=True)
 
+
 class Notification(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False) # Kinsa ang makadawat
-    sender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False) # Kinsa ang nag-trigger
-    post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=True) # Unsa nga post
-    notif_type = db.Column(db.String(20)) # 'like', 'comment', 'admin'
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)    # makadawat
+    sender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)  # nag-trigger
+    post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=True)
+    notif_type = db.Column(db.String(20))
     message = db.Column(db.String(255))
     is_read = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=ph_time)
-
-    # Relationships para dali ra i-display ang pangalan sa sender
     sender = db.relationship('User', foreign_keys=[sender_id])
 
-# --- 3. HELPERS & UTILITIES ---
+
+# --------------------------------------------------------------------------
+# 2. HELPERS
+# --------------------------------------------------------------------------
+USERNAME_RE = re.compile(r'[A-Za-z0-9_]{3,20}')
+
+
+def current_user():
+    uid = session.get('user_id')
+    return db.session.get(User, uid) if uid else None
+
 
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        if 'user_id' not in session: return redirect(url_for('login'))
+        if 'user_id' not in session:
+            return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated
 
-# PARA MA-UPDATE ANG LAST SEEN KADA CLICK
+
+def master_admin_required(f):
+    """Para sa 'admin' nga username ra."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        user = current_user()
+        if not user or user.username != 'admin':
+            return "Forbidden", 403
+        return f(*args, **kwargs)
+    return decorated
+
+
+def get_follower_count(user_id):
+    return Follow.query.filter_by(followed_id=user_id).count()
+
+
+def is_following(follower_id, followed_id):
+    if not follower_id:
+        return False
+    return Follow.query.filter_by(follower_id=follower_id, followed_id=followed_id).first() is not None
+
+
+app.jinja_env.globals.update(is_following=is_following, get_follower_count=get_follower_count)
+
+
+def post_owner_id(post):
+    """Karaan nga posts mahimong walay author_id; pangitaon gamit ang username."""
+    if post.author_id:
+        return post.author_id
+    owner = User.query.filter_by(username=post.author).first()
+    return owner.id if owner else None
+
+
+def notify(owner_id, sender, post, notif_type, text, toast):
+    """I-save ang notification ug i-emit ang real-time signal (kung dili iya kaugalingon)."""
+    if not owner_id or owner_id == sender.id:
+        return
+    db.session.add(Notification(user_id=owner_id, sender_id=sender.id, post_id=post.id,
+                                notif_type=notif_type, message=text))
+    socketio.emit('notify', {'message': toast, 'type': notif_type}, room=f"user_{owner_id}")
+
+
+def upload_media(file, allow_video=True):
+    """Mo-upload sa Cloudinary. Mobalik ug (url, media_type). Image/video ra ang gitugotan."""
+    mime = (file.mimetype or '').lower()
+    allowed = ('image/', 'video/') if allow_video else ('image/',)
+    if not mime.startswith(allowed):
+        raise ValueError("Image o video ra ang gitugotan." if allow_video else "Image ra ang gitugotan.")
+    res = cloudinary.uploader.upload(file, resource_type="auto")
+    media_type = 'video' if res.get('resource_type') == 'video' else 'image'
+    return res.get('secure_url'), media_type
+
+
 @app.before_request
 def update_last_seen():
-    if 'user_id' in session:
-        user = db.session.get(User, session['user_id'])
-        if user:
-            user.last_seen = ph_time()
+    # I-skip ang static files ug socket.io; i-update ra kada 2 minutos (dili kada click)
+    if request.endpoint in (None, 'static') or request.path.startswith('/socket.io'):
+        return
+    uid = session.get('user_id')
+    if not uid:
+        return
+    user = db.session.get(User, uid)
+    if user is None:
+        session.clear()
+        return
+    now = ph_time()
+    if not user.last_seen or (now - user.last_seen).total_seconds() > 120:
+        user.last_seen = now
+        try:
             db.session.commit()
+        except Exception:
+            db.session.rollback()
+
 
 @app.context_processor
 def utility_processor():
@@ -158,18 +258,14 @@ def utility_processor():
         return User.query.filter_by(username=username).first()
 
     def get_read_time(content):
-        words_per_minute = 200
-        words = len(content.split())
-        return max(1, round(words / words_per_minute))
+        return max(1, round(len((content or '').split()) / 200))
 
     def time_ago(date):
-        if not date: return ""
-        now = ph_time() 
-        diff = now - date
-
+        if not date:
+            return ""
+        diff = ph_time() - date
         if diff.total_seconds() < 60:
             return "just now"
-
         periods = (
             (diff.days // 365, "year", "years"),
             (diff.days // 30, "month", "months"),
@@ -183,20 +279,17 @@ def utility_processor():
                 return f"{period} {singular if period == 1 else plural} ago"
         return "just now"
 
-    # --- KANI ANG BAG-O NGA GI-ADD PARA SA STATUS ---
     def get_user_status(user_id):
         user = db.session.get(User, user_id)
-        if not user: return "Offline"
-        
-        # 5 minutes (300 seconds) limit para sa Online status
+        if not user:
+            return "Offline"
         if user.last_seen and (ph_time() - user.last_seen).total_seconds() < 300:
             return "Online"
-        
         return f"Active {time_ago(user.last_seen)}" if user.last_seen else "Offline"
-    # -----------------------------------------------
 
     def user_has_liked(user_id, post_id):
-        if not user_id: return False
+        if not user_id:
+            return False
         return Like.query.filter_by(user_id=user_id, post_id=post_id).first() is not None
 
     def get_like_count(post_id):
@@ -208,15 +301,9 @@ def utility_processor():
     def get_comments_for_post(post_id):
         return Comment.query.filter_by(post_id=post_id).order_by(Comment.created_at.desc()).all()
 
-    def get_follower_count(user_id):
-        return Follow.query.filter_by(followed_id=user_id).count()
+    uid = session.get('user_id')
+    unread = Message.query.filter_by(receiver_id=uid, is_read=False).count() if uid else 0
 
-    def is_following(follower_id, followed_id):
-        if not follower_id: return False
-        return Follow.query.filter_by(follower_id=follower_id, followed_id=followed_id).first() is not None
-# ... (ubos sa is_following function)
-
-    # KINI NGA RETURN DAPAT NAA SA SULOD SA utility_processor
     return dict(
         get_user_by_username=get_user_by_username,
         get_read_time=get_read_time,
@@ -228,62 +315,47 @@ def utility_processor():
         get_comments_for_post=get_comments_for_post,
         get_follower_count=get_follower_count,
         is_following=is_following,
-        unread_count=Message.query.filter_by(receiver_id=session.get('user_id'), is_read=False).count() if 'user_id' in session else 0,
+        unread_count=unread,
         now_utc=ph_time()
     )
 
-# SIGUROHA NGA KINI NGA LINE NAA SA GAWAS (Walay space sa sugod)
+
 @socketio.on('connect')
 def handle_connect():
     if 'user_id' in session:
-        room = f"user_{session['user_id']}"
-        join_room(room)
-        print(f"DEBUG: User {session['user_id']} connected to room: {room}")
-# --- 4. ROUTES ---
+        join_room(f"user_{session['user_id']}")
 
+
+# --------------------------------------------------------------------------
+# 3. ROUTES: PUBLIC / AUTH
+# --------------------------------------------------------------------------
 @app.route('/')
 def public_home():
     tab = request.args.get('tab', 'discover')
-    user = db.session.get(User, session.get('user_id')) if 'user_id' in session else None
+    user = current_user()
 
-    # 1. Main Post Filtering Logic
+    query = Post.query.filter_by(approved=True)
     if tab == 'video':
-        posts = Post.query.filter_by(approved=True, media_type='video').order_by(Post.created_at.desc()).all()
+        query = query.filter_by(media_type='video')
     elif tab == 'following' and user:
         followed_ids = [f.followed_id for f in Follow.query.filter_by(follower_id=user.id).all()]
-        posts = Post.query.filter(Post.author_id.in_(followed_ids), Post.approved==True).order_by(Post.created_at.desc()).all()
-    else:
-        posts = Post.query.filter_by(approved=True).order_by(Post.created_at.desc()).all()
+        query = query.filter(Post.author_id.in_(followed_ids))
+    posts = query.order_by(Post.created_at.desc()).limit(50).all()   # limit para dili mabug-at
 
-    # 2. Check for New Posts (Last 24 Hours) para sa Pop-up
-    time_threshold = datetime.utcnow() - timedelta(hours=24)
-    has_new_post = Post.query.filter(Post.approved==True, Post.created_at >= time_threshold).first() is not None
+    time_threshold = ph_time() - timedelta(hours=24)
+    has_new_post = Post.query.filter(Post.approved == True, Post.created_at >= time_threshold).first() is not None
 
-    return render_template('home_public.html', 
-                           posts=posts, 
-                           user=user, 
-                           active_tab=tab, 
-                           has_new_post=has_new_post)
+    return render_template('home_public.html', posts=posts, user=user,
+                           active_tab=tab, has_new_post=has_new_post)
 
-@app.route('/change-password', methods=['GET', 'POST'])
-@login_required
-def change_password():
-    user = db.session.get(User, session['user_id'])
-    if request.method == 'POST':
-        old_pw = request.form.get('old_password')
-        new_pw = request.form.get('new_password')
-        confirm_pw = request.form.get('confirm_password')
 
-        if not check_password_hash(user.password, old_pw):
-            flash("Sayop imong karaan nga password!", "error")
-        elif new_pw != confirm_pw:
-            flash("Dili parehas ang new password ug confirm password!", "error")
-        else:
-            user.password = generate_password_hash(new_pw)
-            db.session.commit()
-            flash("Success! Na-ilis na imong password.", "success")
-            return redirect(url_for('profile_settings'))
-    return render_template('change_password.html', user=user)
+@app.route('/reels')
+def reels():
+    user = current_user()
+    posts = (Post.query.filter_by(approved=True, media_type='video')
+             .order_by(Post.created_at.desc()).limit(30).all())
+    return render_template('reels.html', posts=posts, user=user)
+
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -293,275 +365,287 @@ def register():
         if not username or not password:
             flash("Ayaw kalimti ang username ug password!")
             return redirect(url_for('register'))
-        existing_user = User.query.filter_by(username=username).first()
-        if existing_user:
+        if not USERNAME_RE.fullmatch(username):
+            flash("Username: letters, numbers, underscore ra, 3-20 ka characters.")
+            return redirect(url_for('register'))
+        if len(password) < 6:
+            flash("Ang password kinahanglan labing menos 6 ka characters.")
+            return redirect(url_for('register'))
+        if User.query.filter(db.func.lower(User.username) == username.lower()).first():
             flash("Naa na nay naggamit sa maong username. Pagpili og lain.")
             return redirect(url_for('register'))
-        hashed_pw = generate_password_hash(password)
         is_first = User.query.count() == 0
-        new_user = User(username=username, password=hashed_pw, is_admin=is_first)
-        db.session.add(new_user)
+        db.session.add(User(username=username, password=generate_password_hash(password), is_admin=is_first))
         db.session.commit()
         flash("Rehistrado na ka! Pwede na ka mo-login.")
         return redirect(url_for('login'))
     return render_template('register.html')
 
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        user = User.query.filter_by(username=request.form['username']).first()
-        if user and check_password_hash(user.password, request.form['password']):
+        user = User.query.filter_by(username=request.form.get('username', '')).first()
+        if user and check_password_hash(user.password, request.form.get('password', '')):
             session.clear()
             session['user_id'] = user.id
+            session.permanent = True
             return redirect(url_for('dashboard'))
         flash("Sayop ang imong username o password.")
     return render_template('login.html')
 
-@app.route('/dashboard')
-@login_required
-def dashboard():
-    user = db.session.get(User, session['user_id'])
-    
-    # --- 1. LOGIC PARA SA MASTER ADMIN ---
-    if user.username == 'admin':
-        all_users = User.query.all()
-        all_messages = Message.query.order_by(Message.created_at.desc()).all()
-        # Admin dashboard render
-        return render_template('admin.html',
-                               users=all_users,
-                               messages=all_messages,
-                               user=user)
-    
-    # --- 2. LOGIC PARA SA NORMAL USERS (my_dashboard.html) ---
-    # Kuhaon ang imong kaugalingong mga posts
-    posts = Post.query.filter_by(author_id=user.id).order_by(Post.created_at.desc()).all()
-    
-    # I-ihap ang unread Notifications (Likes/Comments)
-    notif_count = Notification.query.filter_by(user_id=user.id, is_read=False).count()
-    
-    # I-ihap ang unread Messages (DMs)
-    msg_count = Message.query.filter_by(receiver_id=user.id, is_read=False).count()
-
-    return render_template('my_dashboard.html', 
-                           posts=posts, 
-                           user=user, 
-                           unread_notifs=notif_count,
-                           unread_msgs=msg_count)
-
-# --- 3. KINI ANG ROUTE PARA SA NOTIFICATIONS PAGE ---
-@app.route('/notifications')
-@login_required
-def notifications():
-    user_id = session['user_id']
-    
-    # Kuhaon ang tanang alerts
-    all_notifs = Notification.query.filter_by(user_id=user_id).order_by(Notification.created_at.desc()).all()
-    
-    # I-mark as read tanan inig abli sa page
-    unread = Notification.query.filter_by(user_id=user_id, is_read=False).all()
-    for n in unread:
-        n.is_read = True
-    db.session.commit()
-    
-    return render_template('notifications.html', notifications=all_notifs)
-
-@app.route('/create', methods=['GET', 'POST'])
-@login_required
-def create_post():
-    user = db.session.get(User, session['user_id'])
-    if request.method == 'POST':
-        title = request.form.get('title')
-        content = request.form.get('content')
-        hashtags = request.form.get('hashtags')
-        slug = re.sub(r'[^a-zA-Z0-9 ]', '', title).replace(" ", "-").lower() + "-" + str(int(ph_time().timestamp()))
-        media_url, media_type = None, None
-        
-        if 'media_file' in request.files:
-            file = request.files['media_file']
-            if file and file.filename != '':
-                res = cloudinary.uploader.upload(file, resource_type="auto")
-                media_url = res.get('secure_url')
-                media_type = 'video' if 'video' in str(res.get('resource_type')) else 'image'
-        
-        new_post = Post(
-            title=title,
-            content=content,
-            hashtags=hashtags,
-            slug=slug,
-            author=user.username,
-            author_id=user.id,
-            approved=True,
-            media_file=media_url,
-            media_type=media_type
-        )
-        db.session.add(new_post)
-        db.session.commit()
-        return redirect(url_for('dashboard'))
-    return render_template('create_post.html')
-
-@app.route('/edit/<int:post_id>', methods=['GET', 'POST'])
-@login_required
-def edit_post(post_id):
-    post = Post.query.get_or_404(post_id)
-    user = db.session.get(User, session['user_id'])
-    if post.author != user.username and not user.is_admin:
-        return "Unauthorized", 403
-
-    if request.method == 'POST':
-        post.title = request.form.get('title')
-        post.content = request.form.get('content')
-        file = request.files.get('media_file')
-        if file and file.filename != '':
-            try:
-                upload_result = upload(file)
-                post.media_file = upload_result['secure_url']
-                post.media_type = 'video' if 'video' in file.mimetype else 'image'
-            except Exception as e:
-                flash(f"Error uploading media: {str(e)}", "danger")
-                return render_template('edit_post.html', post=post)
-
-        db.session.commit()
-        flash("Post updated successfully!", "success")
-        return redirect(url_for('dashboard'))
-    return render_template('edit_post.html', post=post)
-
-@app.route('/approve/<int:post_id>', methods=['POST'])
-@login_required
-def approve_post(post_id):
-    user = db.session.get(User, session['user_id'])
-    if user.is_admin:
-        post = Post.query.get_or_404(post_id)
-        post.approved = True
-        db.session.commit()
-    return redirect(url_for('dashboard'))
-
-@app.route('/reject/<int:post_id>')
-@login_required
-def reject_post(post_id):
-    user = db.session.get(User, session['user_id'])
-    if user.is_admin:
-        post = Post.query.get_or_404(post_id)
-        db.session.delete(post)
-        db.session.commit()
-    return redirect(url_for('dashboard'))
-
-@app.route('/settings', methods=['GET', 'POST'])
-@login_required
-def profile_settings():
-    user = db.session.get(User, session['user_id'])
-    if request.method == 'POST':
-        user.bio = request.form.get('bio')
-        if 'profile_pic' in request.files:
-            p_file = request.files['profile_pic']
-            if p_file and p_file.filename != '':
-                p_res = cloudinary.uploader.upload(p_file)
-                user.profile_pic = p_res.get('secure_url')
-        if 'background_pic' in request.files:
-            bg_file = request.files['background_pic']
-            if bg_file and bg_file.filename != '':
-                bg_res = cloudinary.uploader.upload(bg_file)
-                user.background_pic = bg_res.get('secure_url')
-        try:
-            db.session.commit()
-            return redirect(url_for('user_profile', username=user.username))
-        except Exception as e:
-            db.session.rollback()
-            return f"Naay error sa pag-save: {str(e)}"
-    return render_template('profile_settings.html', user=user)
 
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect(url_for('public_home'))
 
+
+@app.route('/change-password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    user = current_user()
+    if request.method == 'POST':
+        old_pw = request.form.get('old_password', '')
+        new_pw = request.form.get('new_password', '')
+        confirm_pw = request.form.get('confirm_password', '')
+        if not check_password_hash(user.password, old_pw):
+            flash("Sayop imong karaan nga password!", "error")
+        elif new_pw != confirm_pw:
+            flash("Dili parehas ang new password ug confirm password!", "error")
+        elif len(new_pw) < 6:
+            flash("Ang password kinahanglan labing menos 6 ka characters.", "error")
+        else:
+            user.password = generate_password_hash(new_pw)
+            db.session.commit()
+            flash("Success! Na-ilis na imong password.", "success")
+            return redirect(url_for('profile_settings'))
+    return render_template('change_password.html', user=user)
+
+
+# --------------------------------------------------------------------------
+# 4. ROUTES: DASHBOARD / POSTS
+# --------------------------------------------------------------------------
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    user = current_user()
+    if user is None:
+        session.clear()
+        return redirect(url_for('login'))
+
+    if user.username == 'admin':
+        return render_template('admin.html',
+                               users=User.query.all(),
+                               messages=Message.query.order_by(Message.created_at.desc()).all(),
+                               user=user)
+
+    posts = Post.query.filter_by(author_id=user.id).order_by(Post.created_at.desc()).all()
+    notif_count = Notification.query.filter_by(user_id=user.id, is_read=False).count()
+    msg_count = Message.query.filter_by(receiver_id=user.id, is_read=False).count()
+    return render_template('my_dashboard.html', posts=posts, user=user,
+                           unread_notifs=notif_count, unread_msgs=msg_count)
+
+
+@app.route('/notifications')
+@login_required
+def notifications():
+    user_id = session['user_id']
+    all_notifs = (Notification.query.filter_by(user_id=user_id)
+                  .order_by(Notification.created_at.desc()).limit(100).all())
+    # I-render una (gamit ang is_read karon), unya i-mark as read
+    html = render_template('notifications.html', notifications=all_notifs)
+    for n in all_notifs:
+        n.is_read = True
+    db.session.commit()
+    return html
+
+
+@app.route('/create', methods=['GET', 'POST'])
+@login_required
+def create_post():
+    user = current_user()
+    if request.method == 'POST':
+        title = (request.form.get('title') or '').strip()
+        content = (request.form.get('content') or '').strip()
+        hashtags = request.form.get('hashtags')
+        if not title or not content:
+            flash("Kinahanglan naay title ug content.")
+            return render_template('create_post.html')
+
+        slug_base = re.sub(r'[^a-zA-Z0-9 ]', '', title).strip().replace(" ", "-").lower() or "post"
+        slug = f"{slug_base[:150]}-{int(ph_time().timestamp())}"
+
+        media_url, media_type = None, None
+        file = request.files.get('media_file')
+        if file and file.filename:
+            try:
+                media_url, media_type = upload_media(file)
+            except Exception as e:
+                flash(f"Upload error: {e}")
+                return render_template('create_post.html')
+
+        db.session.add(Post(title=title, content=content, hashtags=hashtags, slug=slug,
+                            author=user.username, author_id=user.id, approved=True,
+                            media_file=media_url, media_type=media_type))
+        db.session.commit()
+        return redirect(url_for('dashboard'))
+    return render_template('create_post.html')
+
+
+@app.route('/edit/<int:post_id>', methods=['GET', 'POST'])
+@login_required
+def edit_post(post_id):
+    post = Post.query.get_or_404(post_id)
+    user = current_user()
+    if post.author != user.username and not user.is_admin:
+        return "Unauthorized", 403
+
+    if request.method == 'POST':
+        post.title = (request.form.get('title') or post.title).strip()
+        post.content = request.form.get('content') or post.content
+        file = request.files.get('media_file')
+        if file and file.filename:
+            try:
+                post.media_file, post.media_type = upload_media(file)
+            except Exception as e:
+                flash(f"Error uploading media: {e}", "danger")
+                return render_template('edit_post.html', post=post)
+        db.session.commit()
+        flash("Post updated successfully!", "success")
+        return redirect(url_for('dashboard'))
+    return render_template('edit_post.html', post=post)
+
+
+@app.route('/approve/<int:post_id>', methods=['POST'])
+@login_required
+def approve_post(post_id):
+    user = current_user()
+    if user.is_admin:
+        post = Post.query.get_or_404(post_id)
+        post.approved = True
+        db.session.commit()
+    return redirect(url_for('dashboard'))
+
+
+@app.route('/reject/<int:post_id>', methods=['POST'])
+@login_required
+def reject_post(post_id):
+    user = current_user()
+    if user.is_admin:
+        post = Post.query.get_or_404(post_id)
+        db.session.delete(post)
+        db.session.commit()
+    return redirect(url_for('dashboard'))
+
+
+@app.route('/post/<slug>')
+def view_post(slug):
+    post = Post.query.filter_by(slug=slug).first_or_404()
+    user = current_user()
+    if not post.approved and not (user and (user.is_admin or user.id == post.author_id)):
+        return "Not found", 404
+    return render_template('view_post.html', post=post)
+
+
+@app.route('/delete/<int:post_id>', methods=['POST'])
+@login_required
+def delete_post(post_id):
+    user = current_user()
+    post = db.session.get(Post, post_id)
+    if not post:
+        return redirect(url_for('dashboard'))
+    if post.author_id == user.id or post.author == user.username or user.is_admin:
+        try:
+            db.session.delete(post)   # cascade: likes, comments, notifications
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"Delete Error: {e}")
+            return "Error deleting post.", 500
+        return redirect(url_for('dashboard'))
+    return "Bawal! Dili ni nimo post ug dili ka Admin.", 403
+
+
+# --------------------------------------------------------------------------
+# 5. ROUTES: PROFILE / SOCIAL
+# --------------------------------------------------------------------------
+@app.route('/settings', methods=['GET', 'POST'])
+@login_required
+def profile_settings():
+    user = current_user()
+    if request.method == 'POST':
+        user.bio = (request.form.get('bio') or '')[:500]
+        try:
+            for field, attr in (('profile_pic', 'profile_pic'), ('background_pic', 'background_pic')):
+                f = request.files.get(field)
+                if f and f.filename:
+                    url, _ = upload_media(f, allow_video=False)
+                    setattr(user, attr, url)
+            db.session.commit()
+            return redirect(url_for('user_profile', username=user.username))
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Naay error sa pag-save: {e}")
+    return render_template('profile_settings.html', user=user)
+
+
 @app.route('/user/<username>')
 def user_profile(username):
     target_user = User.query.filter_by(username=username).first_or_404()
-    user_posts = Post.query.filter_by(author=username, approved=True).order_by(Post.created_at.desc()).all()
-    logged_in_user = db.session.get(User, session.get('user_id')) if 'user_id' in session else None
-    return render_template('profile.html', target_user=target_user, posts=user_posts, user=logged_in_user)
+    user_posts = (Post.query.filter_by(author=username, approved=True)
+                  .order_by(Post.created_at.desc()).all())
+    return render_template('profile.html', target_user=target_user, posts=user_posts, user=current_user())
+
 
 @app.route('/like/<int:post_id>', methods=['POST'])
 def like_post(post_id):
-    if 'user_id' not in session: 
+    if 'user_id' not in session:
         return {"error": "Unauthorized"}, 401
-    
-    user_id = session['user_id']
+    user = current_user()
+    if user is None:
+        return {"error": "Unauthorized"}, 401
     post = Post.query.get_or_404(post_id)
 
-    # Kuhaon ang user object para sa real-time username
-    user_who_liked = db.session.get(User, user_id)
-    existing_like = Like.query.filter_by(user_id=user_id, post_id=post_id).first()
-
-    if existing_like:
-        db.session.delete(existing_like)
+    existing = Like.query.filter_by(user_id=user.id, post_id=post_id).first()
+    try:
+        if existing:
+            db.session.delete(existing)
+            liked = False
+        else:
+            db.session.add(Like(user_id=user.id, post_id=post_id))
+            notify(post_owner_id(post), user, post, 'like',
+                   f"liked your post: {post.title[:30]}...",
+                   f'❤️ {user.username} liked your post!')
+            liked = True
         db.session.commit()
-        return {"liked": False, "count": Like.query.filter_by(post_id=post_id).count()}
-    else:
-        # Create bag-ong Like
-        new_like = Like(user_id=user_id, post_id=post_id)
-        db.session.add(new_like)
+    except Exception as e:
+        db.session.rollback()
+        print(f"Like error: {e}")
+        return {"error": "Failed"}, 500
+    return {"liked": liked, "count": Like.query.filter_by(post_id=post_id).count()}
 
-        # Notification Logic (Database + Real-time)
-        if post.author_id != user_id:
-            # 1. I-save sa Database para makita sa Notifications Page
-            new_notif = Notification(
-                user_id=post.author_id,
-                sender_id=user_id,
-                post_id=post.id,
-                notif_type='like',
-                message=f"liked your post: {post.title[:30]}..."
-            )
-            db.session.add(new_notif)
-
-            # 2. I-emit ang Real-time signal sa Dashboard (SocketIO)
-            socketio.emit('notify', {
-                'message': f'❤️ {user_who_liked.username} liked your post!',
-                'type': 'like'
-            }, room=f"user_{post.author_id}")
-
-        db.session.commit()
-        return {"liked": True, "count": Like.query.filter_by(post_id=post_id).count()}
 
 @app.route('/comment/<int:post_id>', methods=['POST'])
 def add_comment(post_id):
     if 'user_id' not in session:
         return {"error": "Unauthorized"}, 401
-    
-    # Siguroha nga husto ang indentation ani:
-    user = db.session.get(User, session['user_id'])
+    user = current_user()
+    if user is None:
+        return {"error": "Unauthorized"}, 401
     post = Post.query.get_or_404(post_id)
 
-    data = request.get_json()
-    content = data.get('content', '').strip()
-    
+    data = request.get_json(silent=True) or {}
+    content = (data.get('content') or '').strip()[:500]
     if not content:
         return {"error": "Empty comment"}, 400
 
-    # 1. Create ang comment object
     new_comment = Comment(post_id=post_id, user_id=user.id, content=content)
     db.session.add(new_comment)
-    
-    # 2. Notification Logic
-    if post.author_id != user.id:
-        preview = (content[:30] + '...') if len(content) > 30 else content
-
-        new_notif = Notification(
-            user_id=post.author_id, # Ang makadawat (Author sa post)
-            sender_id=user.id,      # Ang nag-trigger
-            post_id=post.id,
-            notif_type='comment',
-            message=f"commented on your post: \"{preview}\""
-        )
-        db.session.add(new_notif)
-
-        # --- REAL-TIME SIGNAL ---
-        socketio.emit('notify', {
-            'message': f'💬 {user.username} commented on your post!',
-            'type': 'comment'
-        }, room=f"user_{post.author_id}")
-
-    # 3. Commit tanan (Comment + Notification)
+    preview = (content[:30] + '...') if len(content) > 30 else content
+    notify(post_owner_id(post), user, post, 'comment',
+           f'commented on your post: "{preview}"',
+           f'💬 {user.username} commented on your post!')
     try:
         db.session.commit()
     except Exception as e:
@@ -569,208 +653,24 @@ def add_comment(post_id):
         print(f"Database Error: {e}")
         return {"error": "Failed to save comment"}, 500
 
-    formatted_time = new_comment.created_at.strftime('%b %d, %I:%M %p')
-    
     return {
         "success": True,
         "id": new_comment.id,
         "username": user.username,
-        "profile_pic": user.profile_pic if user.profile_pic else f"https://ui-avatars.com/api/?name={user.username}",
+        "profile_pic": user.profile_pic or f"https://ui-avatars.com/api/?name={user.username}",
         "content": content,
-        "created_at": formatted_time
+        "created_at": new_comment.created_at.strftime('%b %d, %I:%M %p')
     }
 
-@app.route('/follow/<int:user_id>', methods=['POST'])
-def follow_user(user_id):
-    if 'user_id' not in session: return jsonify({'error': 'unauthorized'}), 401
-    current_user_id = session['user_id']
-    if current_user_id == user_id: return jsonify({'error': 'cannot follow yourself'}), 400
-    existing_follow = Follow.query.filter_by(follower_id=current_user_id, followed_id=user_id).first()
-    if existing_follow:
-        db.session.delete(existing_follow)
-        db.session.commit()
-        return jsonify({'status': 'unfollowed', 'count': get_follower_count(user_id)})
-    else:
-        new_follow = Follow(follower_id=current_user_id, followed_id=user_id)
-        db.session.add(new_follow)
-        db.session.commit()
-        return jsonify({'status': 'followed', 'count': get_follower_count(user_id)})
-
-def get_follower_count(user_id):
-    return Follow.query.filter_by(followed_id=user_id).count()
-
-def is_following(follower_id, followed_id):
-    return Follow.query.filter_by(follower_id=follower_id, followed_id=followed_id).first() is not None
-
-app.jinja_env.globals.update(is_following=is_following, get_follower_count=get_follower_count)
-
-@app.route('/post/<slug>')
-def view_post(slug):
-    post = Post.query.filter_by(slug=slug).first_or_404()
-    return render_template('view_post.html', post=post)
-
-@app.route('/delete/<int:post_id>', methods=['POST'])  # Gi-shorten para mo-match sa imong HTML request
-def delete_post(post_id):
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-
-    user = db.session.get(User, session['user_id'])
-    
-    # Mas maayo gamiton ang .get() kaysa get_or_404 para malikayan ang ghost 404 errors
-    post = db.session.get(Post, post_id)
-
-    if not post:
-        print(f"Post {post_id} not found.")
-        return redirect(url_for('dashboard'))
-
-    # CHECK: Kung siya ang tag-iya O kung Admin siya
-    if post.author_id == user.id or user.is_admin:
-        try:
-            # Tungod sa atong cascade setup sa Post model,
-            # ma-delete na sab apil ang Likes, Comments, ug Notifications ani.
-            db.session.delete(post)
-            db.session.commit()
-            print(f"Post {post_id} successfully deleted by {user.username}")
-            return redirect(url_for('dashboard'))
-        except Exception as e:
-            db.session.rollback()
-            print(f"Delete Error: {e}")
-            return f"Error deleting post: {e}", 500
-    else:
-        # Security Block
-        return "Bawal! Dili ni nimo post ug dili ka Admin.", 403
-
-@app.route('/sw.js')
-def serve_sw():
-    return send_from_directory('static', 'sw.js', mimetype='application/javascript')
-
-@app.route('/manifest.json')
-def serve_manifest():
-    return send_from_directory('static', 'manifest.json')
-
-@app.route('/messages')
-@app.route('/messages/<int:user_id>')
-@login_required
-def inbox(user_id=None):
-    current_user_id = session['user_id']
-    current_user = db.session.get(User, current_user_id)
-
-    # Chat history logic
-    messages_query = Message.query.filter(
-        (Message.sender_id == current_user_id) | (Message.receiver_id == current_user_id)
-    ).order_by(Message.created_at.desc()).all()
-
-    chat_partners_ids = []
-    partners = []
-    for msg in messages_query:
-        partner_id = msg.receiver_id if msg.sender_id == current_user_id else msg.sender_id
-        if partner_id not in chat_partners_ids:
-            partner = db.session.get(User, partner_id)
-            if partner:
-                partners.append(partner)
-                chat_partners_ids.append(partner_id)
-
-    active_chat = []
-    selected_user = None
-    if user_id:
-        selected_user = db.session.get(User, user_id)
-        if selected_user:
-            active_chat = Message.query.filter(
-                ((Message.sender_id == current_user_id) & (Message.receiver_id == user_id)) | 
-                ((Message.sender_id == user_id) & (Message.receiver_id == current_user_id))
-            ).order_by(Message.created_at.asc()).all()
-            
-            unread = Message.query.filter_by(sender_id=user_id, receiver_id=current_user_id, is_read=False).all()
-            for m in unread: m.is_read = True
-            db.session.commit()
-
-    return render_template('messages.html', partners=partners, active_chat=active_chat, selected_user=selected_user, user=current_user, active_tab='messages')
-
-@app.route('/send_message/<int:receiver_id>', methods=['POST'])
-@login_required
-def send_message(receiver_id):
-    content = request.form.get('content')
-    parent_id = request.form.get('parent_id') # Gikan sa hidden input sa message.html
-    
-    # Check kung empty ba ang content
-    if not content or not content.strip():
-        return redirect(request.referrer or url_for('inbox', user_id=receiver_id))
-    
-    # I-process ang parent_id (kung naay gi-replyan o wala)
-    p_id = None
-    if parent_id and parent_id.isdigit():
-        p_id = int(parent_id)
-
-    # I-create ang bag-ong message nga naay parent_id
-    new_msg = Message(
-        sender_id=session['user_id'], 
-        receiver_id=receiver_id, 
-        content=content.strip(),
-        parent_id=p_id
-    )
-    
-    try:
-        db.session.add(new_msg)
-        db.session.commit()
-        return redirect(url_for('inbox', user_id=receiver_id))
-    except Exception as e:
-        db.session.rollback()
-        # Print sa terminal para makita nimo ang error kung naa man gani
-        print(f"Error: {e}")
-        return "Error sending message.", 500
-
-@app.route('/react_message/<int:message_id>', methods=['POST'])
-@login_required
-def react_message(message_id):
-    data = request.get_json()
-    reaction = data.get('reaction')
-    
-    msg = Message.query.get_or_404(message_id)
-    # Pwede ra bisan kinsa mo-react (sender o receiver)
-    msg.reaction = reaction 
-    
-    try:
-        db.session.commit()
-        return {"status": "success", "reaction": reaction}, 200
-    except Exception as e:
-        db.session.rollback()
-        return {"status": "error"}, 500
-
-@app.route('/api/unread-count')
-def unread_count():
-    if 'user_id' not in session:
-        return {"count": 0, "messages": 0}
-
-    user_id = session['user_id']
-
-    # 1. Ihap sa General Notifications (Likes, Comments, etc.)
-    notif_count = Notification.query.filter_by(user_id=user_id, is_read=False).count()
-
-    # 2. Ihap sa Private Messages (DMs)
-    # Siguroha nga ang imong Message model naay 'recipient_id' ug 'is_read'
-    msg_count = Message.query.filter_by(recipient_id=user_id, is_read=False).count()
-
-    return {
-        "count": notif_count,      # Alang sa bell icon
-        "messages": msg_count,    # Alang sa chat icon
-        "total": notif_count + msg_count
-    }
 
 @app.route('/delete_comment/<int:comment_id>', methods=['POST'])
 def delete_comment(comment_id):
-    # 1. Siguroha nga naka-login ang user
     if 'user_id' not in session:
         return jsonify({"success": False, "error": "Please login first"}), 401
-
-    user = db.session.get(User, session['user_id'])
+    user = current_user()
     comment = db.session.get(Comment, comment_id)
-
-    # 2. Check kung naa ba ang comment sa database
     if not comment:
         return jsonify({"success": False, "error": "Comment not found"}), 404
-
-    # 3. Security Check: Tag-iya ba siya sa comment O Admin ba siya?
-    # Kinahanglan pud nato i-check ang tag-iya sa post (optional pero nindot ni)
     if comment.user_id == user.id or user.is_admin:
         try:
             db.session.delete(comment)
@@ -779,117 +679,196 @@ def delete_comment(comment_id):
         except Exception as e:
             db.session.rollback()
             return jsonify({"success": False, "error": str(e)}), 500
-    else:
-        return jsonify({"success": False, "error": "Bawal! Dili ni nimo comment."}), 403
+    return jsonify({"success": False, "error": "Bawal! Dili ni nimo comment."}), 403
 
-@app.route('/chat/<int:sender_id>')
-def chat(sender_id):
-    # ... imong logic sa pagkuha og messages ...
-    
-    # "Tatak" as Read:
-    unread_msgs = Message.query.filter_by(
-        sender_id=sender_id, 
-        recipient_id=session['user_id'], 
-        is_read=False
-    ).all()
-    
-    for msg in unread_msgs:
-        msg.is_read = True
+
+@app.route('/follow/<int:user_id>', methods=['POST'])
+def follow_user(user_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'unauthorized'}), 401
+    me = session['user_id']
+    if me == user_id:
+        return jsonify({'error': 'cannot follow yourself'}), 400
+    if not db.session.get(User, user_id):
+        return jsonify({'error': 'user not found'}), 404
+    existing = Follow.query.filter_by(follower_id=me, followed_id=user_id).first()
+    if existing:
+        db.session.delete(existing)
+        status = 'unfollowed'
+    else:
+        db.session.add(Follow(follower_id=me, followed_id=user_id))
+        status = 'followed'
     db.session.commit()
-    
-    # ... return render_template ...
+    return jsonify({'status': status, 'count': get_follower_count(user_id)})
+
+
+# --------------------------------------------------------------------------
+# 6. ROUTES: MESSAGES
+# --------------------------------------------------------------------------
+@app.route('/messages')
+@app.route('/messages/<int:user_id>')
+@login_required
+def inbox(user_id=None):
+    me_id = session['user_id']
+    me = current_user()
+
+    msgs = Message.query.filter(
+        (Message.sender_id == me_id) | (Message.receiver_id == me_id)
+    ).order_by(Message.created_at.desc()).all()
+
+    seen, partners = set(), []
+    for msg in msgs:
+        pid = msg.receiver_id if msg.sender_id == me_id else msg.sender_id
+        if pid not in seen:
+            seen.add(pid)
+            partner = db.session.get(User, pid)
+            if partner:
+                partners.append(partner)
+
+    active_chat, selected_user = [], None
+    if user_id:
+        selected_user = db.session.get(User, user_id)
+        if selected_user:
+            active_chat = Message.query.filter(
+                ((Message.sender_id == me_id) & (Message.receiver_id == user_id)) |
+                ((Message.sender_id == user_id) & (Message.receiver_id == me_id))
+            ).order_by(Message.created_at.asc()).all()
+            for m in Message.query.filter_by(sender_id=user_id, receiver_id=me_id, is_read=False).all():
+                m.is_read = True
+            db.session.commit()
+
+    return render_template('messages.html', partners=partners, active_chat=active_chat,
+                           selected_user=selected_user, user=me, active_tab='messages')
+
+
+@app.route('/send_message/<int:receiver_id>', methods=['POST'])
+@login_required
+def send_message(receiver_id):
+    content = (request.form.get('content') or '').strip()[:2000]
+    parent_id = request.form.get('parent_id')
+    if not content or not db.session.get(User, receiver_id):
+        return redirect(request.referrer or url_for('inbox', user_id=receiver_id))
+
+    p_id = int(parent_id) if parent_id and parent_id.isdigit() else None
+    try:
+        db.session.add(Message(sender_id=session['user_id'], receiver_id=receiver_id,
+                               content=content, parent_id=p_id))
+        db.session.commit()
+        return redirect(url_for('inbox', user_id=receiver_id))
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error: {e}")
+        return "Error sending message.", 500
+
+
+@app.route('/react_message/<int:message_id>', methods=['POST'])
+@login_required
+def react_message(message_id):
+    data = request.get_json(silent=True) or {}
+    reaction = (data.get('reaction') or '')[:20] or None
+    msg = Message.query.get_or_404(message_id)
+    # Sender o receiver ra ang pwede mo-react
+    if session['user_id'] not in (msg.sender_id, msg.receiver_id):
+        return {"status": "forbidden"}, 403
+    msg.reaction = reaction
+    try:
+        db.session.commit()
+        return {"status": "success", "reaction": reaction}, 200
+    except Exception:
+        db.session.rollback()
+        return {"status": "error"}, 500
+
 
 @app.route('/delete_message/<int:message_id>', methods=['GET', 'POST'])
+@login_required
 def delete_message(message_id):
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    
-    # Pangitaon ang message sa Neon DB
     message = Message.query.get_or_404(message_id)
-    
-    # Siguroha nga ang sender ang nag-delete (sender_id base sa imong model)
     if message.sender_id == session['user_id']:
         db.session.delete(message)
         db.session.commit()
-        print(f"Message {message_id} deleted successfully!") # Para makita nimo sa Termux log
         return redirect(request.referrer or url_for('inbox'))
-    else:
-        return "Dili nimo mahimong papason kini.", 403
+    return "Dili nimo mahimong papason kini.", 403
 
-@app.route('/admin/delete_user/<int:user_id>')
+
+@app.route('/api/unread-count')
+def unread_count():
+    if 'user_id' not in session:
+        return {"count": 0, "messages": 0, "total": 0}
+    uid = session['user_id']
+    notif_count = Notification.query.filter_by(user_id=uid, is_read=False).count()
+    msg_count = Message.query.filter_by(receiver_id=uid, is_read=False).count()
+    return {"count": notif_count, "messages": msg_count, "total": notif_count + msg_count}
+
+
+# --------------------------------------------------------------------------
+# 7. ROUTES: ADMIN (POST ra, 'admin' account ra)
+# --------------------------------------------------------------------------
+@app.route('/admin/delete_user/<int:user_id>', methods=['POST'])
+@login_required
+@master_admin_required
 def admin_delete_user(user_id):
-    # Gigamit ang db.session.get() para mawala ang LegacyAPIWarning
-    current_admin = db.session.get(User, session.get('user_id'))
-    
-    if current_admin and current_admin.username == 'admin':
-        user_to_delete = db.session.get(User, user_id)
-        
-        if not user_to_delete:
-            return "User not found", 404
-            
-        try:
-            # 1. I-delete ang messages
-            Message.query.filter_by(sender_id=user_id).delete()
-            
-            # 2. I-delete ang posts (Gigamit ang 'Post' diretso kay naa ra ni sa app.py)
-            # Kung ang imong Post model naay field nga 'author', kani gamita:
-            Post.query.filter_by(author=user_to_delete.username).delete()
-            
-            # 3. I-delete ang User mismo
-            db.session.delete(user_to_delete)
-            db.session.commit()
-            print(f"SUCCESS: User {user_to_delete.username} deleted!")
-            
-        except Exception as e:
-            db.session.rollback()
-            print(f"DATABASE ERROR: {str(e)}")
-            return f"Error: {str(e)}", 500
-            
+    target = db.session.get(User, user_id)
+    if not target:
+        return "User not found", 404
+    if target.username == 'admin':
+        return "Dili ma-delete ang admin.", 400
+    try:
+        # Posts una (ORM delete para mo-cascade ang likes/comments/notifications)
+        for post in Post.query.filter((Post.author_id == user_id) | (Post.author == target.username)).all():
+            db.session.delete(post)
+        db.session.flush()
+        Like.query.filter_by(user_id=user_id).delete()
+        Comment.query.filter_by(user_id=user_id).delete()
+        Reaction.query.filter_by(user_id=user_id).delete()
+        Follow.query.filter((Follow.follower_id == user_id) | (Follow.followed_id == user_id)).delete()
+        Notification.query.filter((Notification.user_id == user_id) | (Notification.sender_id == user_id)).delete()
+        # Message replies: i-null ang parent_id sa mga naka-reply sa iyang messages
+        own_ids = [m.id for m in Message.query.filter(
+            (Message.sender_id == user_id) | (Message.receiver_id == user_id)).all()]
+        if own_ids:
+            Message.query.filter(Message.parent_id.in_(own_ids)).update({Message.parent_id: None}, synchronize_session=False)
+        Message.query.filter((Message.sender_id == user_id) | (Message.receiver_id == user_id)).delete()
+        db.session.delete(target)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"DATABASE ERROR: {e}")
+        return f"Error: {e}", 500
     return redirect(url_for('dashboard'))
-# Route para sa Delete Message (Admin Only)
-@app.route('/admin/delete_message/<int:msg_id>')
+
+
+@app.route('/admin/delete_message/<int:msg_id>', methods=['POST'])
+@login_required
+@master_admin_required
 def admin_delete_message(msg_id):
-    # I-check kung ikaw ba ang naka-login isip 'admin'
-    current_admin = db.session.get(User, session.get('user_id'))
-    
-    if current_admin and current_admin.username == 'admin':
-        # Pangitaon ang message sa database gamit ang ID
-        msg = db.session.get(Message, msg_id)
-        
-        if msg:
-            try:
-                db.session.delete(msg)
-                db.session.commit()
-                print(f"SUCCESS: Message ID {msg_id} deleted!")
-            except Exception as e:
-                db.session.rollback()
-                print(f"DATABASE ERROR: {str(e)}")
-                return f"Error: {str(e)}", 500
-        else:
-            return "Message not found", 404
-            
-    # I-redirect balik sa dashboard human sa pag-delete
+    msg = db.session.get(Message, msg_id)
+    if not msg:
+        return "Message not found", 404
+    try:
+        Message.query.filter_by(parent_id=msg_id).update({Message.parent_id: None})
+        db.session.delete(msg)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"DATABASE ERROR: {e}")
+        return f"Error: {e}", 500
     return redirect(url_for('dashboard'))
 
-@app.route('/test-notif')
-def test_notif():
-    if 'user_id' in session:
-        socketio.emit('notify', {
-            'message': 'SYSTEM OVERRIDE: TEST NOTIFICATION SUCCESSFUL!'
-        }, room=f"user_{session['user_id']}")
-        return "Notif Sent!"
-    return "Login first"
 
-@app.route('/reels')
-def reels():
-    user = db.session.get(User, session['user_id']) if 'user_id' in session else None
-    posts = (Post.query
-             .filter_by(approved=True, media_type='video')
-             .order_by(Post.created_at.desc())
-             .limit(30).all())
-    return render_template('reels.html', posts=posts, user=user)
+# --------------------------------------------------------------------------
+# 8. PWA FILES
+# --------------------------------------------------------------------------
+@app.route('/sw.js')
+def serve_sw():
+    return send_from_directory('static', 'sw.js', mimetype='application/javascript')
+
+
+@app.route('/manifest.json')
+def serve_manifest():
+    return send_from_directory('static', 'manifest.json')
 
 
 if __name__ == '__main__':
-    # Usba ni sa pinaka-ubos nga part sa imong app.py
-    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
+    # Local lang ni. Sa Render, gunicorn ang mo-run: gunicorn -k eventlet -w 1 app:app
+    socketio.run(app, debug=os.environ.get("DEBUG") == "1", host='0.0.0.0',
+                 port=int(os.environ.get("PORT", 5000)))
