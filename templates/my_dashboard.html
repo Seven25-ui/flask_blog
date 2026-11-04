@@ -8,29 +8,15 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Orbitron:wght@900&display=swap" rel="stylesheet">
     <style>
         :root { --bg-deep: #000000; --sky-accent: #0ea5e9; }
-
-        body {
-            background-color: var(--bg-deep);
-            color: #f1f5f9;
-            font-family: 'Inter', sans-serif;
-            overflow-x: hidden;
-        }
-
+        body { background-color: var(--bg-deep); color: #f1f5f9; font-family: 'Inter', sans-serif; overflow-x: hidden; }
         .brand-font { font-family: 'Orbitron', sans-serif; letter-spacing: 0.15em; }
+        .text-brand-gradient { background: linear-gradient(45deg, #0ea5e9, #60a5fa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 
-        .text-brand-gradient {
-            background: linear-gradient(45deg, #0ea5e9, #60a5fa);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        /* Animations */
         @keyframes brandPulse {
             0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0px rgba(14, 165, 233, 0)); }
             50% { transform: scale(1.05); filter: drop-shadow(0 0 10px rgba(14, 165, 233, 0.6)); }
         }
-        .animate-pulse-brand { animation: brandPulse 3s infinite ease-in-out; }
-
+        .animate-pulse-brand { animation: brandPulse 3s infinite ease-in-out; display: inline-block; }
         .sidebar-transition { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
 
         @keyframes glitch-anim {
@@ -42,54 +28,54 @@
         }
         .glitch-active { animation: glitch-anim 0.1s infinite; filter: contrast(250%) brightness(1.8); }
 
-        /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: #000; }
         ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
 
         .desk-link { transition: all .15s ease; }
         .desk-link:hover { background: rgba(255,255,255,0.05); }
+        .bottom-nav { padding-bottom: env(safe-area-inset-bottom); }
+        @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
     </style>
 </head>
 <body class="selection:bg-sky-500/30">
 
-<div id="matrixOverlay" class="fixed inset-0 z-[100] bg-black flex items-center justify-center transition-opacity duration-[1000ms]">
-    <audio id="bootSound" src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3" preload="auto"></audio>
+<!-- Boot screen: mogawas ra kausa kada session -->
+<div id="matrixOverlay" class="fixed inset-0 z-[100] bg-black flex items-center justify-center transition-opacity duration-[800ms]">
     <canvas id="matrixCanvas" class="absolute inset-0"></canvas>
-    <div id="bootContent" class="relative z-10 text-center">
+    <div class="relative z-10 text-center">
         <div class="mb-4 inline-block px-4 py-1 border border-sky-500/50 bg-sky-500/10 rounded-full">
             <span class="text-[10px] font-black text-sky-400 tracking-[0.3em] uppercase animate-pulse">Integrity: Secure</span>
         </div>
-        <h1 id="main-logo" class="brand-font text-5xl text-sky-500 tracking-[0.6em] mb-4">SE7EN</h1>
+        <h1 class="brand-font text-5xl text-sky-500 tracking-[0.6em] mb-4">SE7EN</h1>
         <div class="flex flex-col items-center gap-2">
             <p id="boot-text" class="text-[11px] font-black text-sky-800 tracking-widest uppercase italic">Establishing Link...</p>
             <div class="w-48 h-[2px] bg-gray-900 rounded-full overflow-hidden">
-                <div id="boot-progress" class="h-full bg-sky-500 transition-all duration-[7000ms] ease-linear w-0"></div>
+                <div id="boot-progress" class="h-full bg-sky-500 transition-all duration-[3000ms] ease-linear w-0"></div>
             </div>
         </div>
+        <button onclick="skipBoot()" class="mt-8 text-[10px] text-gray-600 hover:text-sky-500 tracking-widest uppercase">Skip</button>
     </div>
 </div>
 
-<audio id="notifSound" src="https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3" preload="auto"></audio>
+<audio id="notifSound" src="https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3" preload="none"></audio>
 
 <!-- Mobile-only top bar -->
 <nav class="lg:hidden sticky top-0 z-50 bg-black/80 backdrop-blur-xl border-b border-gray-800">
     <div class="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
-        <button onclick="toggleMenu()" class="p-2 hover:bg-gray-800 rounded-lg">
+        <button onclick="toggleMenu()" aria-label="Open menu" class="p-2 hover:bg-gray-800 rounded-lg">
             <svg class="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 12h10M4 18h16"/></svg>
         </button>
         <span class="brand-font text-2xl font-black text-brand-gradient italic animate-pulse-brand">SE7EN</span>
         <div class="flex items-center gap-3">
-            {% if user %}
-            <a href="{{ url_for('notifications') }}" class="relative p-2 hover:bg-gray-800 rounded-lg">
+            <a href="{{ url_for('notifications') }}" aria-label="Notifications" class="relative p-2 hover:bg-gray-800 rounded-lg">
                 <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
-                <span id="notif-badge" class="hidden absolute top-2 right-2 flex h-2.5 w-2.5">
+                <span id="notif-badge" class="{{ '' if unread_notifs else 'hidden' }} absolute top-2 right-2 h-2.5 w-2.5">
                     <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
                     <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-sky-500 border border-black"></span>
                 </span>
             </a>
-            <img src="{{ user.profile_pic if user.profile_pic else 'https://ui-avatars.com/api/?name=' + user.username }}" class="w-8 h-8 rounded-full border border-gray-700">
-            {% endif %}
+            <img src="{{ user.profile_pic if user.profile_pic else 'https://ui-avatars.com/api/?name=' + user.username }}" alt="" class="w-8 h-8 rounded-full border border-gray-700 object-cover">
         </div>
     </div>
 </nav>
@@ -100,7 +86,12 @@
         <h2 class="brand-font text-xl font-black text-brand-gradient italic mb-8">SE7EN</h2>
         <nav class="flex flex-col gap-1">
             <a href="{{ url_for('public_home') }}" class="flex items-center gap-4 p-3 hover:bg-gray-800 rounded-xl text-gray-400 font-bold"><span>🏠</span> Home</a>
+            <a href="{{ url_for('inbox') }}" class="flex items-center justify-between p-3 hover:bg-gray-800 rounded-xl text-gray-400 font-bold">
+                <div class="flex items-center gap-4"><span>💬</span> Messages</div>
+                {% if unread_msgs %}<span class="bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full">{{ unread_msgs }}</span>{% endif %}
+            </a>
             <a href="{{ url_for('dashboard') }}" class="flex items-center gap-4 p-3 bg-sky-500/10 text-sky-500 rounded-xl font-bold"><span>📊</span> Dashboard</a>
+            <a href="{{ url_for('user_profile', username=user.username) }}" class="flex items-center gap-4 p-3 hover:bg-gray-800 rounded-xl text-gray-400 font-bold"><span>👤</span> Profile</a>
             <a href="{{ url_for('profile_settings') }}" class="flex items-center gap-4 p-3 hover:bg-gray-800 rounded-xl text-gray-400 font-bold"><span>⚙️</span> Settings</a>
             <hr class="border-gray-800 my-4">
             <a href="{{ url_for('logout') }}" class="flex items-center gap-4 p-3 text-red-500 font-bold hover:bg-red-500/10 rounded-xl"><span>🚪</span> Logout</a>
@@ -111,7 +102,7 @@
 <!-- Desktop shell -->
 <div class="lg:flex lg:w-full lg:max-w-[1280px] lg:mx-auto">
 
-    <!-- LEFT: persistent desktop sidebar -->
+    <!-- LEFT: desktop sidebar -->
     <aside class="hidden lg:flex lg:flex-col lg:w-64 xl:w-72 lg:h-screen lg:sticky lg:top-0 lg:shrink-0 border-r border-gray-800 px-4 py-6">
         <a href="{{ url_for('public_home') }}" class="flex items-center gap-2 px-2 mb-8">
             <span class="brand-font text-2xl font-black text-brand-gradient italic animate-pulse-brand">SE7EN</span>
@@ -119,32 +110,31 @@
 
         <nav class="flex-1 space-y-1">
             <a href="{{ url_for('public_home') }}" class="desk-link flex items-center gap-4 px-3 py-3 rounded-xl font-bold text-gray-300"><span class="text-xl">🏠</span> <span>Home</span></a>
+            <a href="{{ url_for('inbox') }}" class="desk-link flex items-center justify-between px-3 py-3 rounded-xl font-bold text-gray-300">
+                <div class="flex items-center gap-4"><span class="text-xl">💬</span> <span>Messages</span></div>
+                {% if unread_msgs %}<span class="bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full">{{ unread_msgs }}</span>{% endif %}
+            </a>
             <a href="{{ url_for('dashboard') }}" class="flex items-center gap-4 px-3 py-3 bg-sky-500/10 text-sky-500 rounded-xl font-bold"><span class="text-xl">📊</span> <span>Dashboard</span></a>
-            {% if user %}
             <a href="{{ url_for('notifications') }}" class="desk-link flex items-center justify-between px-3 py-3 rounded-xl font-bold text-gray-300">
                 <div class="flex items-center gap-4"><span class="text-xl">🔔</span> <span>Notifications</span></div>
-                <span id="notif-badge-desktop" class="hidden w-2.5 h-2.5 rounded-full bg-sky-500"></span>
+                <span id="notif-badge-desktop" class="{{ '' if unread_notifs else 'hidden' }} w-2.5 h-2.5 rounded-full bg-sky-500"></span>
             </a>
-            {% endif %}
+            <a href="{{ url_for('user_profile', username=user.username) }}" class="desk-link flex items-center gap-4 px-3 py-3 rounded-xl font-bold text-gray-300"><span class="text-xl">👤</span> <span>Profile</span></a>
             <a href="{{ url_for('profile_settings') }}" class="desk-link flex items-center gap-4 px-3 py-3 rounded-xl font-bold text-gray-300"><span class="text-xl">⚙️</span> <span>Settings</span></a>
         </nav>
 
-        <a href="{{ url_for('create_post') }}" class="w-full text-center bg-sky-500 hover:bg-sky-400 text-white font-bold py-3 rounded-full transition shadow-lg shadow-sky-500/20 mb-4">
-            + New Post
-        </a>
+        <a href="{{ url_for('create_post') }}" class="w-full text-center bg-sky-500 hover:bg-sky-400 text-white font-bold py-3 rounded-full transition shadow-lg shadow-sky-500/20 mb-4">+ New Post</a>
         <a href="{{ url_for('logout') }}" class="desk-link flex items-center gap-4 px-3 py-3 rounded-xl font-bold text-red-500"><span class="text-xl">🚪</span> <span>Logout</span></a>
     </aside>
 
-    <!-- CENTER: dashboard content -->
+    <!-- CENTER -->
     <main class="w-full lg:max-w-3xl min-h-screen lg:border-x border-gray-800 pb-32">
 
         <div class="p-6 border-b border-gray-800">
             <div class="bg-gradient-to-br from-sky-600 to-blue-800 lg:p-10 p-8 rounded-[2.5rem] text-white shadow-2xl shadow-sky-500/20">
-                <h2 class="text-3xl lg:text-4xl font-black mb-2 tracking-tight">Welcome, {{ user.username }}!</h2>
-                <p class="text-sky-100 text-sm opacity-90 mb-6 font-medium">Identify: Aloy | Status: Active Admin</p>
-                <a href="{{ url_for('create_post') }}" class="inline-flex items-center px-8 py-4 bg-white text-sky-600 font-black rounded-2xl text-xs tracking-widest uppercase hover:scale-105 transition-transform">
-                    + New Deployment
-                </a>
+                <h2 class="text-3xl lg:text-4xl font-black mb-2 tracking-tight break-words">Welcome, {{ user.username }}!</h2>
+                <p class="text-sky-100 text-sm opacity-90 mb-6 font-medium">{{ 'Admin' if user.is_admin else 'Member' }} · {{ posts|length }} post{{ '' if posts|length == 1 else 's' }}</p>
+                <a href="{{ url_for('create_post') }}" class="inline-flex items-center px-8 py-4 bg-white text-sky-600 font-black rounded-2xl text-xs tracking-widest uppercase hover:scale-105 transition-transform">+ New Post</a>
             </div>
         </div>
 
@@ -163,31 +153,63 @@
             </div>
         </div>
 
+        {% if unread_notifs or unread_msgs %}
+        <div class="px-6 py-4 flex flex-wrap gap-3 border-b border-gray-800">
+            {% if unread_notifs %}
+            <a href="{{ url_for('notifications') }}" class="px-4 py-2 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-400 text-sm font-bold">🔔 {{ unread_notifs }} bag-ong notification{{ '' if unread_notifs == 1 else 's' }}</a>
+            {% endif %}
+            {% if unread_msgs %}
+            <a href="{{ url_for('inbox') }}" class="px-4 py-2 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 text-sm font-bold">💬 {{ unread_msgs }} wala pa nabasa nga message{{ '' if unread_msgs == 1 else 's' }}</a>
+            {% endif %}
+        </div>
+        {% endif %}
+
         <div class="lg:grid lg:grid-cols-2 divide-y divide-gray-800 lg:divide-y-0">
             {% if posts %}
                 {% for post in posts %}
                 <article class="p-6 hover:bg-white/[0.02] transition-all group lg:border-b lg:border-gray-800 {{ 'lg:border-r' if loop.index0 is even }}">
-                    <div class="flex justify-between items-start mb-6">
-                        <div>
-                            <h3 class="font-bold text-lg text-gray-100 mb-1 leading-tight group-hover:text-sky-400 transition">{{ post.title }}</h3>
-                            <p class="text-[10px] text-gray-500 uppercase tracking-widest font-black italic">Timestamp: {{ post.created_at.strftime('%Y-%m-%d') }}</p>
+                    <div class="flex justify-between items-start gap-3 mb-6">
+                        <div class="min-w-0">
+                            <h3 class="font-bold text-lg text-gray-100 mb-1 leading-tight group-hover:text-sky-400 transition break-words">{{ post.title }}</h3>
+                            <p class="text-xs text-gray-500">{{ post.created_at.strftime('%b %d, %Y') }}</p>
                         </div>
-                        <span class="px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-tighter border {{ 'border-green-500/30 bg-green-500/5 text-green-400' if post.approved else 'border-yellow-500/30 bg-yellow-500/5 text-yellow-400' }}">
-                            {{ 'Published' if post.approved else 'In Review' }}
+                        <span class="shrink-0 px-3 py-1.5 rounded-full text-[10px] font-bold border {{ 'border-green-500/30 bg-green-500/5 text-green-400' if post.approved else 'border-yellow-500/30 bg-yellow-500/5 text-yellow-400' }}">
+                            {{ 'Published' if post.approved else 'In review' }}
                         </span>
                     </div>
-                    <div class="flex gap-3">
-                        <a href="{{ url_for('view_post', slug=post.slug) }}" class="flex-1 py-3 text-center bg-gray-900 border border-gray-700 rounded-xl text-[10px] font-black tracking-widest hover:border-sky-500 transition">VIEW DATA</a>
-                        <a href="{{ url_for('edit_post', post_id=post.id) }}" class="flex-1 py-3 text-center bg-sky-500/10 text-sky-500 border border-sky-500/20 rounded-xl text-[10px] font-black tracking-widest hover:bg-sky-500 hover:text-white transition">MODIFY</a>
+                    <div class="flex gap-2">
+                        <a href="{{ url_for('view_post', slug=post.slug) }}" class="flex-1 py-3 text-center bg-gray-900 border border-gray-700 rounded-xl text-xs font-bold hover:border-sky-500 transition">View</a>
+                        <a href="{{ url_for('edit_post', post_id=post.id) }}" class="flex-1 py-3 text-center bg-sky-500/10 text-sky-500 border border-sky-500/20 rounded-xl text-xs font-bold hover:bg-sky-500 hover:text-white transition">Edit</a>
+                        <form action="{{ url_for('delete_post', post_id=post.id) }}" method="POST" onsubmit="return confirm('I-delete ang post? Dili na ni mabalik.');" class="flex-1">
+                            <button type="submit" class="w-full py-3 text-center bg-red-500/10 text-red-400 border border-red-500/20 rounded-xl text-xs font-bold hover:bg-red-500 hover:text-white transition">Delete</button>
+                        </form>
                     </div>
                 </article>
                 {% endfor %}
             {% else %}
-                <div class="lg:col-span-2 p-20 text-center text-gray-600 font-black uppercase tracking-[0.3em] text-xs">No active nodes detected.</div>
+                <div class="lg:col-span-2 p-16 text-center">
+                    <p class="font-bold text-gray-300 mb-1">Wala pay posts</p>
+                    <p class="text-sm text-gray-500 mb-6">Himoa ang imong una nga post.</p>
+                    <a href="{{ url_for('create_post') }}" class="inline-block px-6 py-3 bg-sky-500 hover:bg-sky-400 text-white font-bold rounded-full transition">Create post</a>
+                </div>
             {% endif %}
         </div>
     </main>
 </div>
+
+<!-- Mobile bottom nav -->
+<nav class="bottom-nav lg:hidden fixed bottom-0 inset-x-0 z-40 bg-black/90 backdrop-blur-xl border-t border-gray-800">
+    <div class="max-w-2xl mx-auto h-16 grid grid-cols-5 items-center text-center text-[11px] font-bold">
+        <a href="{{ url_for('public_home') }}" class="flex flex-col items-center gap-0.5 text-gray-500"><span class="text-xl leading-none">🏠</span>Home</a>
+        <a href="{{ url_for('public_home', tab='video') }}" class="flex flex-col items-center gap-0.5 text-gray-500"><span class="text-xl leading-none">🎬</span>Videos</a>
+        <a href="{{ url_for('create_post') }}" aria-label="Create post" class="flex justify-center"><span class="w-12 h-12 -mt-5 bg-sky-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-sky-500/30 active:scale-95 transition">
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg></span></a>
+        <a href="{{ url_for('inbox') }}" class="relative flex flex-col items-center gap-0.5 text-gray-500"><span class="text-xl leading-none">💬</span>Chat
+            {% if unread_msgs %}<span class="absolute top-0 right-5 bg-red-600 text-white text-[9px] px-1.5 rounded-full">{{ unread_msgs }}</span>{% endif %}
+        </a>
+        <a href="{{ url_for('dashboard') }}" class="flex flex-col items-center gap-0.5 text-sky-500"><span class="text-xl leading-none">📊</span>Mine</a>
+    </div>
+</nav>
 
 <script>
     function toggleMenu() {
@@ -195,51 +217,49 @@
         document.getElementById('overlay').classList.toggle('hidden');
     }
 
-    // MATRIX LOGIC
-    const canvas = document.getElementById('matrixCanvas');
-    const ctx = canvas.getContext('2d');
+    // BOOT SCREEN: kausa ra kada session, 3 segundos ra, naay Skip
     const overlay = document.getElementById('matrixOverlay');
-    const bootText = document.getElementById('boot-text');
-    const bootProgress = document.getElementById('boot-progress');
-    const bootSound = document.getElementById('bootSound');
+    let matrixInt = null;
 
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    function skipBoot() {
+        clearInterval(matrixInt);
+        overlay.style.opacity = '0';
+        setTimeout(() => overlay.remove(), 800);
+    }
 
-    const chars = "0101017SE7EN101010";
-    const drops = Array(Math.floor(canvas.width/16)).fill(1);
+    if (sessionStorage.getItem('se7en_booted')) {
+        overlay.remove();
+    } else {
+        sessionStorage.setItem('se7en_booted', '1');
+        const canvas = document.getElementById('matrixCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        const chars = "0101017SE7EN101010";
+        const drops = Array(Math.floor(canvas.width / 16)).fill(1);
 
-    function draw() {
-        ctx.fillStyle = "rgba(0,0,0,0.05)";
-        ctx.fillRect(0,0,canvas.width, canvas.height);
-        ctx.fillStyle = "#0ea5e9";
-        ctx.font = "16px 'Orbitron'";
-        drops.forEach((y, i) => {
-            const text = chars[Math.floor(Math.random()*chars.length)];
-            ctx.fillText(text, i*16, y*16);
-            if(y*16 > canvas.height && Math.random() > 0.975) drops[i] = 0;
-            drops[i]++;
+        function draw() {
+            ctx.fillStyle = "rgba(0,0,0,0.05)";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#0ea5e9";
+            ctx.font = "16px monospace";
+            drops.forEach((y, i) => {
+                ctx.fillText(chars[Math.floor(Math.random() * chars.length)], i * 16, y * 16);
+                if (y * 16 > canvas.height && Math.random() > 0.975) drops[i] = 0;
+                drops[i]++;
+            });
+        }
+        matrixInt = setInterval(draw, 35);
+
+        window.addEventListener('load', () => {
+            setTimeout(() => document.getElementById('boot-progress').style.width = '100%', 100);
+            setTimeout(() => document.getElementById('boot-text').innerText = "Welcome, " + {{ user.username|tojson }} + ".", 1800);
+            setTimeout(() => {
+                overlay.classList.add('glitch-active');
+                setTimeout(() => { overlay.classList.remove('glitch-active'); skipBoot(); }, 500);
+            }, 3200);
         });
     }
-    const matrixInt = setInterval(draw, 35);
-
-    window.addEventListener('load', () => {
-        setTimeout(() => bootProgress.style.width = '100%', 100);
-        bootSound.play().catch(()=>{});
-        setTimeout(() => bootText.innerText = "Analyzing Neural Data...", 2000);
-        setTimeout(() => bootText.innerText = "Welcome, Master Aloy.", 4500);
-
-        setTimeout(() => {
-            overlay.classList.add('glitch-active');
-            setTimeout(() => {
-                overlay.style.opacity = '0';
-                setTimeout(() => {
-                    overlay.style.display = 'none';
-                    clearInterval(matrixInt);
-                }, 1000);
-            }, 1500);
-        }, 6000);
-    });
 </script>
 
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
@@ -248,14 +268,17 @@
     socket.on('notify', (data) => {
         document.getElementById('notif-badge')?.classList.remove('hidden');
         document.getElementById('notif-badge-desktop')?.classList.remove('hidden');
-        document.getElementById('notifSound')?.play().catch(()=>{});
+        document.getElementById('notifSound')?.play().catch(() => {});
         showToast(data.message);
     });
 
     function showToast(msg) {
         const t = document.createElement('div');
-        t.className = "fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] px-6 py-4 bg-black border-2 border-sky-500 rounded-2xl shadow-2xl animate-bounce";
-        t.innerHTML = `<p class="brand-font text-[10px] text-sky-400 font-black">${msg}</p>`;
+        t.className = "fixed bottom-24 lg:bottom-10 left-1/2 -translate-x-1/2 z-[200] px-6 py-4 bg-black border-2 border-sky-500 rounded-2xl shadow-2xl";
+        const p = document.createElement('p');
+        p.className = "text-sm text-sky-400 font-bold";
+        p.textContent = msg;   // textContent, dili innerHTML (safe sa XSS)
+        t.appendChild(p);
         document.body.appendChild(t);
         setTimeout(() => t.remove(), 4000);
     }
