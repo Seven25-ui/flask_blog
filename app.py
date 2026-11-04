@@ -880,6 +880,16 @@ def test_notif():
         return "Notif Sent!"
     return "Login first"
 
+@app.route('/reels')
+def reels():
+    user = db.session.get(User, session['user_id']) if 'user_id' in session else None
+    posts = (Post.query
+             .filter_by(approved=True, media_type='video')
+             .order_by(Post.created_at.desc())
+             .limit(30).all())
+    return render_template('reels.html', posts=posts, user=user)
+
+
 if __name__ == '__main__':
     # Usba ni sa pinaka-ubos nga part sa imong app.py
     socketio.run(app, debug=True, host='0.0.0.0', port=5000)
