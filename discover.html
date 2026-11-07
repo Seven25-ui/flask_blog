@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Discover</title>
+  <style>
+    body { margin:0; font-family:system-ui,sans-serif; background:#111; color:#fff; display:flex; flex-direction:column; align-items:center; min-height:100vh; }
+    nav { width:100%; display:flex; justify-content:space-around; padding:12px 0; background:#1b1b1b; }
+    nav a { color:#ff4d6d; text-decoration:none; font-weight:600; }
+    .card { margin-top:24px; width:min(92vw,380px); background:#1b1b1b; border-radius:18px; overflow:hidden; box-shadow:0 8px 30px #0008; }
+    .card img { width:100%; height:420px; object-fit:cover; display:block; }
+    .info { padding:14px 16px; }
+    .info h2 { margin:0 0 4px; }
+    .muted { color:#aaa; font-size:14px; }
+    .actions { display:flex; justify-content:center; gap:28px; margin:20px 0; }
+    .actions button { width:68px; height:68px; border-radius:50%; border:none; font-size:30px; cursor:pointer; }
+    .pass { background:#2a2a2a; } .like { background:#ff4d6d; }
+    .small { margin-bottom:24px; font-size:13px; }
+    .small button { background:none; border:none; color:#888; cursor:pointer; text-decoration:underline; }
+    #toast { position:fixed; top:70px; background:#ff4d6d; padding:12px 18px; border-radius:12px; display:none; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="{{ url_for('discover') }}">Discover</a>
+    <a href="{{ url_for('matches') }}">Matches</a>
+    <a href="{{ url_for('inbox') }}">Messages</a>
+    <a href="{{ url_for('profile_settings') }}">Profile</a>
+  </nav>
+  <div id="toast"></div>
+
+  {% if candidate %}
+  <div class="card" id="card">
+    <img src="{{ candidate.profile_pic }}" alt="{{ candidate.username }}">
+    <div class="info">
+      <h2>{{ candidate.username }}{% if candidate.birthdate %}, {{ calc_age(candidate.birthdate) }}{% endif %}</h2>
+      {% if candidate.location_text %}<div class="muted">📍 {{ candidate.location_text }}</div>{% endif %}
+      {% if candidate.bio %}<p>{{ candidate.bio }}</p>{% endif %}
+      {% if candidate.interests %}<div class="muted">{{ candidate.interests }}</div>{% endif %}
+    </div>
+  </div>
+  <div class="actions">
+    <button class="pass" onclick="swipe(false)">✖</button>
+    <button class="like" onclick="swipe(true)">❤</button>
+  </div>
+  <div class="small">
+    <button onclick="blockUser()">Block</button> ·
+    <button onclick="reportUser()">Report</button>
+  </div>
+  <script>
+    const targetId = {{ candidate.id }};
+    function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.style.display='block'; setTimeout(()=>t.style.display='none',2500); }
+    async function post(url, body){
+      const r = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});
+      return r.json();
+    }
+    async function swipe(liked){
+      const d = await post('/swipe/'+targetId,{liked});
+      if(d.matched){ toast("💘 It's a match with "+d.username+"!"); setTimeout(()=>location.reload(),1800); }
+      else location.reload();
+    }
+    async function blockUser(){
+      if(!confirm('Block kini nga user?')) return;
+      await post('/block/'+targetId); location.reload();
+    }
+    async function reportUser(){
+      const reason = prompt('Ngano nimo i-report?'); if(!reason) return;
+      await post('/report/'+targetId,{reason}); toast('Na-report na. Salamat.');
+      setTimeout(()=>location.reload(),1200);
+    }
+  </script>
+  {% else %}
+  <p style="margin-top:80px">Wala nay ma-show karon. Balik later 💔</p>
+  {% endif %}
+</body>
+</html>
