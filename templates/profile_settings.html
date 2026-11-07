@@ -23,8 +23,9 @@
         }
         input[type="file"]::-webkit-file-upload-button:hover { background: #38bdf8; }
 
-        textarea, input[type="text"] { background: #0a0a0a !important; border: 1px solid #1e293b !important; }
-        textarea:focus { border-color: #0ea5e9 !important; outline: none; box-shadow: 0 0 15px rgba(14, 165, 233, 0.1); }
+        textarea, input[type="text"], select { background: #0a0a0a !important; border: 1px solid #1e293b !important; }
+        textarea:focus, input[type="text"]:focus, select:focus { border-color: #0ea5e9 !important; outline: none; box-shadow: 0 0 15px rgba(14, 165, 233, 0.1); }
+        select option { background: #000; color: #f1f5f9; }
     </style>
 </head>
 <body class="p-4 md:p-8 selection:bg-sky-500/30">
@@ -53,7 +54,9 @@
                     <img id="preview_img" src="{{ user.profile_pic if user.profile_pic else 'https://ui-avatars.com/api/?name=' + user.username }}"
                          class="relative w-28 h-28 rounded-full object-cover border-4 border-black shadow-2xl">
                 </div>
-                <p class="mt-4 text-xs font-black text-sky-500 uppercase tracking-[0.2em]">@{{ user.username }}</p>
+                <p class="mt-4 text-xs font-black text-sky-500 uppercase tracking-[0.2em]">
+                    @{{ user.username }}{% if user.birthdate %} • {{ calc_age(user.birthdate) }}{% endif %}
+                </p>
             </div>
 
             <form method="POST" enctype="multipart/form-data" class="space-y-8">
@@ -74,8 +77,42 @@
 
                 <div>
                     <label class="block text-[10px] font-black text-gray-500 mb-3 uppercase tracking-widest">Bio / Story</label>
-                    <textarea name="bio" rows="4" placeholder="Tell your story..."
+                    <textarea name="bio" rows="4" maxlength="500" placeholder="Tell your story..."
                               class="w-full p-5 rounded-3xl text-gray-200 leading-relaxed transition-all">{{ user.bio or '' }}</textarea>
+                </div>
+
+                <div>
+                    <label class="block text-[10px] font-black text-gray-500 mb-3 uppercase tracking-widest">City / Area</label>
+                    <input type="text" name="location_text" maxlength="100" value="{{ user.location_text or '' }}"
+                           placeholder="e.g. Cebu City (city lang, ayaw ibutang ang exact address)"
+                           class="w-full px-5 py-4 rounded-2xl text-gray-200 text-sm transition-all">
+                </div>
+
+                <div>
+                    <label class="block text-[10px] font-black text-gray-500 mb-3 uppercase tracking-widest">Interests</label>
+                    <input type="text" name="interests" maxlength="200" value="{{ user.interests or '' }}"
+                           placeholder="e.g. gaming, coding, music, travel"
+                           class="w-full px-5 py-4 rounded-2xl text-gray-200 text-sm transition-all">
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-500 mb-3 uppercase tracking-widest">I am</label>
+                        <select name="gender" class="w-full px-4 py-4 rounded-2xl text-gray-200 text-sm">
+                            <option value="male" {{ 'selected' if user.gender == 'male' }}>Male</option>
+                            <option value="female" {{ 'selected' if user.gender == 'female' }}>Female</option>
+                            <option value="other" {{ 'selected' if user.gender == 'other' }}>Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-500 mb-3 uppercase tracking-widest">Looking for</label>
+                        <select name="looking_for" class="w-full px-4 py-4 rounded-2xl text-gray-200 text-sm">
+                            <option value="everyone" {{ 'selected' if user.looking_for == 'everyone' or not user.looking_for }}>Everyone</option>
+                            <option value="male" {{ 'selected' if user.looking_for == 'male' }}>Male</option>
+                            <option value="female" {{ 'selected' if user.looking_for == 'female' }}>Female</option>
+                            <option value="other" {{ 'selected' if user.looking_for == 'other' }}>Other</option>
+                        </select>
+                    </div>
                 </div>
 
                 <button type="submit"
