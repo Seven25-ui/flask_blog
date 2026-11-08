@@ -1141,12 +1141,41 @@ def admin_delete_message(msg_id):
 # --------------------------------------------------------------------------
 @app.route('/sw.js')
 def serve_sw():
-    return send_from_directory('static', 'sw.js', mimetype='application/javascript')
+    resp = send_from_directory('static', 'sw.js', mimetype='application/javascript')
+    resp.headers['Cache-Control'] = 'no-cache'          # kanunay i-check kung naay bag-ong service worker
+    resp.headers['Service-Worker-Allowed'] = '/'
+    return resp
 
 
 @app.route('/manifest.json')
 def serve_manifest():
-    return send_from_directory('static', 'manifest.json')
+    return send_from_directory('static', 'manifest.json', mimetype='application/manifest+json')
+
+
+# I-inject ang PWA tags sa TANANG HTML pages (wala na kinahanglan usbon ang matag template)
+PWA_SNIPPET = (
+    '<link rel="manifest" href="/manifest.json">'
+    '<meta name="theme-color" content="#000000">'
+    '<meta name="mobile-web-app-capable" content="yes">'
+    '<meta name="apple-mobile-web-app-capable" content="yes">'
+    '<meta name="apple-mobile-web-app-status-bar-style" content="black">'
+    '<link rel="apple-touch-icon" href="/static/icons/icon-192.png">'
+    '<script>if("serviceWorker" in navigator){window.addEventListener("load",function(){'
+    'navigator.serviceWorker.register("/sw.js").catch(function(){});});}</script>'
+)
+
+
+@app.after_request
+def inject_pwa_tags(resp):
+    try:
+        if (resp.status_code == 200 and resp.mimetype == 'text/html'
+                and not resp.direct_passthrough):
+            html = resp.get_data(as_text=True)
+            if '</head>' in html and 'rel="manifest"' not in html:
+                resp.set_data(html.replace('</head>', PWA_SNIPPET + '</head>', 1))
+    except Exception as e:
+        print(f"PWA inject error: {e}")
+    return resp
 
 
 if __name__ == '__main__':
