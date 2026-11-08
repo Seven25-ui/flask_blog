@@ -1,31 +1,173 @@
-# ==========================================================================
-# DATING APP ADDITIONS para sa app.py   (VERSION 2)
-# Gamita sa BAG-ONG repo + BAG-ONG Neon database/branch (para ma-create ang
-# bag-ong columns sa User). Ayaw ni i-deploy sa live nga flask_blog.
-#
-# Karon, tanan REAL CODE na (dili na comments). Ang mga "ILISI" nga functions
-# mopuli sa parehas nga ngalan nga function sa imong app.py.
-# ==========================================================================
+from flask import (Flask, render_template, redirect, url_for, request, session,
+                   flash, jsonify, send_from_directory)
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import or_, and_, func, text
+from werkzeug.security import generate_password_hash, check_password_hash
+import os
+import re
+from datetime import datetime, timedelta
+from functools import wraps
+import cloudinary
+import cloudinary.uploader
+from flask_socketio import SocketIO, join_room
+import eventlet  # gikinahanglan sa async_mode='eventlet'
+
+# Para lang sa local nga pagtrabaho (.env file). Sa Render, Environment Variables ang gamit.
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 
 # --------------------------------------------------------------------------
-# 0) IMPORTS (idugang sa taas sa app.py)
+# 0. CONFIG (tanang secrets gikan na sa environment variables)
 # --------------------------------------------------------------------------
-from sqlalchemy import or_, and_, func
+def require_env(name):
+    value = os.environ.get(name)
+    if not value:
+        raise RuntimeError(f"Missing environment variable: {name}")
+    return value
+
+
+app = Flask(__name__)
+app.secret_key = require_env("SECRET_KEY")
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024          # 100 MB max upload
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'                 # panalipod sa CSRF
+app.config['SESSION_COOKIE_SECURE'] = bool(os.environ.get("RENDER"))
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
+
+# SocketIO (eventlet para sa Render). Pwede nimo i-limit ang origin: ALLOWED_ORIGINS=https://flask-blog-v2.onrender.com
+socketio = SocketIO(app,
+                    cors_allowed_origins=os.environ.get("ALLOWED_ORIGINS", "*"),
+                    async_mode='eventlet')
+
+
+def ph_time():
+    """Oras sa Pilipinas (UTC+8)."""
+    return datetime.utcnow() + timedelta(hours=8)
+
+
+cloudinary.config(
+    cloud_name=require_env("CLOUDINARY_CLOUD_NAME"),
+    api_key=require_env("CLOUDINARY_API_KEY"),
+    api_secret=require_env("CLOUDINARY_API_SECRET"),
+    secure=True
+)
+
+
+def fix_uri(uri):
+    return (uri.replace("postgres://", "postgresql+pg8000://", 1)
+               .replace("postgresql://", "postgresql+pg8000://", 1))
+
+
+app.config['SQLALCHEMY_DATABASE_URI'] = fix_uri(require_env("DATABASE_URL"))
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {"pool_pre_ping": True, "pool_recycle": 280}
+db = SQLAlchemy(app)
 
 
 # --------------------------------------------------------------------------
-# A) MODELS
+# 1. MODELS
 # --------------------------------------------------------------------------
-# 1) Idugang kini nga columns sa sulod sa class User:
-#
-#     birthdate     = db.Column(db.Date, nullable=True)
-#     gender        = db.Column(db.String(20), nullable=True)       # male / female / other
-#     looking_for   = db.Column(db.String(20), default='everyone')  # male / female / other / everyone
-#     location_text = db.Column(db.String(100), nullable=True)      # city lang, dili exact address
-#     interests     = db.Column(db.String(200), nullable=True)
-#
-# 2) Bag-ong tables (ibutang human sa Notification model):
+class User(db.Model):
+    __table_args__ = {'extend_existing': True}
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password = db.Column(db.String(200), nullable=False)
+    is_admin = db.Column(db.Boolean, default=False)
+    bio = db.Column(db.Text, nullable=True)
+    profile_pic = db.Column(db.String(500), default='https://res.cloudinary.com/demo/image/upload/v1/avatar.png')
+    background_pic = db.Column(db.String(500), default='https://res.cloudinary.com/demo/image/upload/v1/sample.jpg')
+    created_at = db.Column(db.DateTime, default=ph_time)
+    last_seen = db.Column(db.DateTime, default=ph_time)
 
+    # --- Dating fields ---
+    birthdate = db.Column(db.Date, nullable=True)
+    gender = db.Column(db.String(20), nullable=True)                 # male / female / other
+    looking_for = db.Column(db.String(20), default='everyone')       # male / female / other / everyone
+    location_text = db.Column(db.String(100), nullable=True)         # city lang, dili exact address
+    interests = db.Column(db.String(200), nullable=True)
+
+
+class Post(db.Model):
+    __table_args__ = {'extend_existing': True}
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    hashtags = db.Column(db.String(200), nullable=True)
+    slug = db.Column(db.String(200), unique=True, nullable=False)
+    author = db.Column(db.String(80), nullable=False)
+    author_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    created_at = db.Column(db.DateTime, default=ph_time)
+    approved = db.Column(db.Boolean, default=True)
+    media_file = db.Column(db.String(500), nullable=True)
+    media_type = db.Column(db.String(10), nullable=True)
+
+    # Inig delete sa Post, ma-delete sab ang likes, comments, notifications
+    likes = db.relationship('Like', backref='post', cascade="all, delete-orphan", lazy=True)
+    comments = db.relationship('Comment', backref='post', cascade="all, delete-orphan", lazy=True)
+    notifications = db.relationship('Notification', backref='post', cascade="all, delete-orphan", lazy=True)
+
+
+class Reaction(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    type = db.Column(db.String(20), default='like')
+
+
+class Like(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=False)
+
+
+class Comment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=ph_time)
+    user = db.relationship('User', backref='user_comments')
+
+
+class Follow(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    follower_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    followed_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=ph_time)
+
+
+class Message(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    receiver_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=ph_time)
+    is_read = db.Column(db.Boolean, default=False)
+    parent_id = db.Column(db.Integer, db.ForeignKey('message.id'), nullable=True)
+
+    sender = db.relationship('User', foreign_keys=[sender_id], backref='sent_messages')
+    receiver = db.relationship('User', foreign_keys=[receiver_id], backref='received_messages')
+    parent_message = db.relationship('Message', remote_side=[id], backref='replies')
+    reaction = db.Column(db.String(20), nullable=True)
+
+
+class Notification(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)    # makadawat
+    sender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)  # nag-trigger
+    post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=True)
+    notif_type = db.Column(db.String(20))
+    message = db.Column(db.String(255))
+    is_read = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=ph_time)
+    sender = db.relationship('User', foreign_keys=[sender_id])
+
+
+# --- Dating tables ---
 class Swipe(db.Model):
     __table_args__ = (db.UniqueConstraint('swiper_id', 'target_id'),)
     id = db.Column(db.Integer, primary_key=True)
@@ -59,8 +201,77 @@ class Report(db.Model):
 
 
 # --------------------------------------------------------------------------
-# B) HELPERS (ibutang human sa notify()/upload_media() helpers)
+# 1b. DATABASE SETUP (luwas sa existing database)
+#     - create_all(): mo-create ra sa bag-ong tables (Swipe, Match, Block, Report)
+#     - ensure_dating_schema(): mo-dugang sa bag-ong columns sa existing "user" table
+#       gamit ang "ADD COLUMN IF NOT EXISTS" -> walay ma-delete, pwede i-run balik-balik
 # --------------------------------------------------------------------------
+def ensure_dating_schema():
+    new_columns = {
+        "birthdate": "DATE",
+        "gender": "VARCHAR(20)",
+        "looking_for": "VARCHAR(20) DEFAULT 'everyone'",
+        "location_text": "VARCHAR(100)",
+        "interests": "VARCHAR(200)",
+    }
+    try:
+        with db.engine.begin() as conn:
+            for name, ddl in new_columns.items():
+                conn.execute(text(f'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS {name} {ddl}'))
+    except Exception as e:
+        print(f"Schema update error: {e}")
+
+
+with app.app_context():
+    try:
+        db.create_all()
+    except Exception as e:
+        print(f"create_all error: {e}")
+    ensure_dating_schema()
+
+
+# --------------------------------------------------------------------------
+# 2. HELPERS
+# --------------------------------------------------------------------------
+USERNAME_RE = re.compile(r'[A-Za-z0-9_]{3,20}')
+
+
+def current_user():
+    uid = session.get('user_id')
+    return db.session.get(User, uid) if uid else None
+
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated
+
+
+def master_admin_required(f):
+    """Para sa 'admin' nga username ra."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        user = current_user()
+        if not user or user.username != 'admin':
+            return "Forbidden", 403
+        return f(*args, **kwargs)
+    return decorated
+
+
+def get_follower_count(user_id):
+    return Follow.query.filter_by(followed_id=user_id).count()
+
+
+def is_following(follower_id, followed_id):
+    if not follower_id:
+        return False
+    return Follow.query.filter_by(follower_id=follower_id, followed_id=followed_id).first() is not None
+
+
+# --- Dating helpers ---
 def calc_age(birthdate):
     if not birthdate:
         return None
@@ -94,12 +305,164 @@ def match_partners(user_id):
     return people
 
 
-app.jinja_env.globals.update(calc_age=calc_age)
+app.jinja_env.globals.update(is_following=is_following, get_follower_count=get_follower_count,
+                             calc_age=calc_age)
+
+
+def post_owner_id(post):
+    """Karaan nga posts mahimong walay author_id; pangitaon gamit ang username."""
+    if post.author_id:
+        return post.author_id
+    owner = User.query.filter_by(username=post.author).first()
+    return owner.id if owner else None
+
+
+def notify(owner_id, sender, post, notif_type, text_msg, toast):
+    """I-save ang notification ug i-emit ang real-time signal (kung dili iya kaugalingon)."""
+    if not owner_id or owner_id == sender.id:
+        return
+    db.session.add(Notification(user_id=owner_id, sender_id=sender.id, post_id=post.id,
+                                notif_type=notif_type, message=text_msg))
+    socketio.emit('notify', {'message': toast, 'type': notif_type}, room=f"user_{owner_id}")
+
+
+def upload_media(file, allow_video=True):
+    """Mo-upload sa Cloudinary. Mobalik ug (url, media_type). Image/video ra ang gitugotan."""
+    mime = (file.mimetype or '').lower()
+    allowed = ('image/', 'video/') if allow_video else ('image/',)
+    if not mime.startswith(allowed):
+        raise ValueError("Image o video ra ang gitugotan." if allow_video else "Image ra ang gitugotan.")
+    res = cloudinary.uploader.upload(file, resource_type="auto")
+    media_type = 'video' if res.get('resource_type') == 'video' else 'image'
+    return res.get('secure_url'), media_type
+
+
+@app.before_request
+def update_last_seen():
+    # I-skip ang static files ug socket.io; i-update ra kada 2 minutos (dili kada click)
+    if request.endpoint in (None, 'static') or request.path.startswith('/socket.io'):
+        return
+    uid = session.get('user_id')
+    if not uid:
+        return
+    user = db.session.get(User, uid)
+    if user is None:
+        session.clear()
+        return
+    now = ph_time()
+    if not user.last_seen or (now - user.last_seen).total_seconds() > 120:
+        user.last_seen = now
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+
+@app.context_processor
+def utility_processor():
+    def get_user_by_username(username):
+        return User.query.filter_by(username=username).first()
+
+    def get_read_time(content):
+        return max(1, round(len((content or '').split()) / 200))
+
+    def time_ago(date):
+        if not date:
+            return ""
+        diff = ph_time() - date
+        if diff.total_seconds() < 60:
+            return "just now"
+        periods = (
+            (diff.days // 365, "year", "years"),
+            (diff.days // 30, "month", "months"),
+            (diff.days // 7, "week", "weeks"),
+            (diff.days, "day", "days"),
+            (diff.seconds // 3600, "hour", "hours"),
+            (diff.seconds // 60, "minute", "minutes"),
+        )
+        for period, singular, plural in periods:
+            if period >= 1:
+                return f"{period} {singular if period == 1 else plural} ago"
+        return "just now"
+
+    def get_user_status(user_id):
+        user = db.session.get(User, user_id)
+        if not user:
+            return "Offline"
+        if user.last_seen and (ph_time() - user.last_seen).total_seconds() < 300:
+            return "Online"
+        return f"Active {time_ago(user.last_seen)}" if user.last_seen else "Offline"
+
+    def user_has_liked(user_id, post_id):
+        if not user_id:
+            return False
+        return Like.query.filter_by(user_id=user_id, post_id=post_id).first() is not None
+
+    def get_like_count(post_id):
+        return Like.query.filter_by(post_id=post_id).count()
+
+    def get_comment_count(post_id):
+        return Comment.query.filter_by(post_id=post_id).count()
+
+    def get_comments_for_post(post_id):
+        return Comment.query.filter_by(post_id=post_id).order_by(Comment.created_at.desc()).all()
+
+    uid = session.get('user_id')
+    unread = Message.query.filter_by(receiver_id=uid, is_read=False).count() if uid else 0
+
+    return dict(
+        get_user_by_username=get_user_by_username,
+        get_read_time=get_read_time,
+        time_ago=time_ago,
+        get_user_status=get_user_status,
+        user_has_liked=user_has_liked,
+        get_like_count=get_like_count,
+        get_comment_count=get_comment_count,
+        get_comments_for_post=get_comments_for_post,
+        get_follower_count=get_follower_count,
+        is_following=is_following,
+        unread_count=unread,
+        now_utc=ph_time()
+    )
+
+
+@socketio.on('connect')
+def handle_connect():
+    if 'user_id' in session:
+        join_room(f"user_{session['user_id']}")
 
 
 # --------------------------------------------------------------------------
-# C) ILISI: register()  -- naay 18+ check ug gender/looking_for
+# 3. ROUTES: PUBLIC / AUTH
 # --------------------------------------------------------------------------
+@app.route('/')
+def public_home():
+    tab = request.args.get('tab', 'discover')
+    user = current_user()
+
+    query = Post.query.filter_by(approved=True)
+    if tab == 'video':
+        query = query.filter_by(media_type='video')
+    elif tab == 'following' and user:
+        followed_ids = [f.followed_id for f in Follow.query.filter_by(follower_id=user.id).all()]
+        query = query.filter(Post.author_id.in_(followed_ids))
+    posts = query.order_by(Post.created_at.desc()).limit(50).all()   # limit para dili mabug-at
+
+    time_threshold = ph_time() - timedelta(hours=24)
+    has_new_post = Post.query.filter(Post.approved == True, Post.created_at >= time_threshold).first() is not None
+
+    return render_template('home_public.html', posts=posts, user=user,
+                           active_tab=tab, has_new_post=has_new_post)
+
+
+@app.route('/reels')
+def reels():
+    user = current_user()
+    posts = (Post.query.filter_by(approved=True, media_type='video')
+             .order_by(Post.created_at.desc()).limit(30).all())
+    return render_template('reels.html', posts=posts, user=user)
+
+
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -150,15 +513,217 @@ def register():
     return render_template('register.html')
 
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        user = User.query.filter_by(username=request.form.get('username', '')).first()
+        if user and check_password_hash(user.password, request.form.get('password', '')):
+            session.clear()
+            session['user_id'] = user.id
+            session.permanent = True
+            return redirect(url_for('dashboard'))
+        flash("Sayop ang imong username o password.")
+    return render_template('login.html')
+
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('public_home'))
+
+
+@app.route('/change-password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    user = current_user()
+    if request.method == 'POST':
+        old_pw = request.form.get('old_password', '')
+        new_pw = request.form.get('new_password', '')
+        confirm_pw = request.form.get('confirm_password', '')
+        if not check_password_hash(user.password, old_pw):
+            flash("Sayop imong karaan nga password!", "error")
+        elif new_pw != confirm_pw:
+            flash("Dili parehas ang new password ug confirm password!", "error")
+        elif len(new_pw) < 6:
+            flash("Ang password kinahanglan labing menos 6 ka characters.", "error")
+        else:
+            user.password = generate_password_hash(new_pw)
+            db.session.commit()
+            flash("Success! Na-ilis na imong password.", "success")
+            return redirect(url_for('profile_settings'))
+    return render_template('change_password.html', user=user)
+
+
 # --------------------------------------------------------------------------
-# D) ILISI: profile_settings()  -- nasave na ang bag-ong fields
-#    (ang birthdate DILI editable, para dili malingla ang 18+)
+# 4. ROUTES: DASHBOARD / POSTS
+# --------------------------------------------------------------------------
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    user = current_user()
+    if user is None:
+        session.clear()
+        return redirect(url_for('login'))
+
+    if user.username == 'admin':
+        return render_template('admin.html',
+                               users=User.query.all(),
+                               messages=Message.query.order_by(Message.created_at.desc()).all(),
+                               user=user)
+
+    posts = Post.query.filter_by(author_id=user.id).order_by(Post.created_at.desc()).all()
+    notif_count = Notification.query.filter_by(user_id=user.id, is_read=False).count()
+    msg_count = Message.query.filter_by(receiver_id=user.id, is_read=False).count()
+    return render_template('my_dashboard.html', posts=posts, user=user,
+                           unread_notifs=notif_count, unread_msgs=msg_count)
+
+
+@app.route('/notifications')
+@login_required
+def notifications():
+    user_id = session['user_id']
+    all_notifs = (Notification.query.filter_by(user_id=user_id)
+                  .order_by(Notification.created_at.desc()).limit(100).all())
+    # I-render una (gamit ang is_read karon), unya i-mark as read
+    html = render_template('notifications.html', notifications=all_notifs)
+    for n in all_notifs:
+        n.is_read = True
+    db.session.commit()
+    return html
+
+
+@app.route('/create', methods=['GET', 'POST'])
+@login_required
+def create_post():
+    user = current_user()
+    if request.method == 'POST':
+        title = (request.form.get('title') or '').strip()
+        content = (request.form.get('content') or '').strip()
+        hashtags = request.form.get('hashtags')
+        if not title or not content:
+            flash("Kinahanglan naay title ug content.")
+            return render_template('create_post.html')
+
+        slug_base = re.sub(r'[^a-zA-Z0-9 ]', '', title).strip().replace(" ", "-").lower() or "post"
+        slug = f"{slug_base[:150]}-{int(ph_time().timestamp())}"
+
+        media_url, media_type = None, None
+        file = request.files.get('media_file')
+        if file and file.filename:
+            try:
+                media_url, media_type = upload_media(file)
+            except Exception as e:
+                flash(f"Upload error: {e}")
+                return render_template('create_post.html')
+
+        db.session.add(Post(title=title, content=content, hashtags=hashtags, slug=slug,
+                            author=user.username, author_id=user.id, approved=True,
+                            media_file=media_url, media_type=media_type))
+        db.session.commit()
+        return redirect(url_for('dashboard'))
+    return render_template('create_post.html')
+
+
+@app.route('/edit/<int:post_id>', methods=['GET', 'POST'])
+@login_required
+def edit_post(post_id):
+    post = Post.query.get_or_404(post_id)
+    user = current_user()
+    if post.author != user.username and not user.is_admin:
+        return "Unauthorized", 403
+
+    if request.method == 'POST':
+        post.title = (request.form.get('title') or post.title).strip()
+        post.content = request.form.get('content') or post.content
+        file = request.files.get('media_file')
+        if file and file.filename:
+            try:
+                post.media_file, post.media_type = upload_media(file)
+            except Exception as e:
+                flash(f"Error uploading media: {e}", "danger")
+                return render_template('edit_post.html', post=post)
+        db.session.commit()
+        flash("Post updated successfully!", "success")
+        return redirect(url_for('dashboard'))
+    return render_template('edit_post.html', post=post)
+
+
+@app.route('/approve/<int:post_id>', methods=['POST'])
+@login_required
+def approve_post(post_id):
+    user = current_user()
+    if user.is_admin:
+        post = Post.query.get_or_404(post_id)
+        post.approved = True
+        db.session.commit()
+    return redirect(url_for('dashboard'))
+
+
+@app.route('/reject/<int:post_id>', methods=['POST'])
+@login_required
+def reject_post(post_id):
+    user = current_user()
+    if user.is_admin:
+        post = Post.query.get_or_404(post_id)
+        db.session.delete(post)
+        db.session.commit()
+    return redirect(url_for('dashboard'))
+
+
+@app.route('/post/<slug>')
+def view_post(slug):
+    post = Post.query.filter_by(slug=slug).first_or_404()
+    user = current_user()
+    if not post.approved and not (user and (user.is_admin or user.id == post.author_id)):
+        return "Not found", 404
+    return render_template('view_post.html', post=post)
+
+
+@app.route('/delete/<int:post_id>', methods=['POST'])
+@login_required
+def delete_post(post_id):
+    user = current_user()
+    post = db.session.get(Post, post_id)
+    if not post:
+        return redirect(url_for('dashboard'))
+    if post.author_id == user.id or post.author == user.username or user.is_admin:
+        try:
+            db.session.delete(post)   # cascade: likes, comments, notifications
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"Delete Error: {e}")
+            return "Error deleting post.", 500
+        return redirect(url_for('dashboard'))
+    return "Bawal! Dili ni nimo post ug dili ka Admin.", 403
+
+
+# --------------------------------------------------------------------------
+# 5. ROUTES: PROFILE / SOCIAL
 # --------------------------------------------------------------------------
 @app.route('/settings', methods=['GET', 'POST'])
 @login_required
 def profile_settings():
     user = current_user()
     if request.method == 'POST':
+        # Birthdate: ma-set ra KUNG WALA PA (para sa karaan nga accounts). Dili na ma-usab human ma-set.
+        if not user.birthdate:
+            bd_raw = (request.form.get('birthdate') or '').strip()
+            if bd_raw:
+                try:
+                    bd = datetime.strptime(bd_raw, '%Y-%m-%d').date()
+                except ValueError:
+                    flash("Ibutang ang saktong birthdate.")
+                    return redirect(url_for('profile_settings'))
+                age = calc_age(bd)
+                if age < 18:
+                    flash("18 anyos pataas ra ang pwede.")
+                    return redirect(url_for('profile_settings'))
+                if age > 100:
+                    flash("Ibutang ang saktong birthdate.")
+                    return redirect(url_for('profile_settings'))
+                user.birthdate = bd
+
         try:
             user.bio = (request.form.get('bio') or '')[:500]
             user.location_text = (request.form.get('location_text') or '').strip()[:100] or None
@@ -184,13 +749,134 @@ def profile_settings():
     return render_template('profile_settings.html', user=user)
 
 
+@app.route('/user/<username>')
+def user_profile(username):
+    target_user = User.query.filter_by(username=username).first_or_404()
+    me_id = session.get('user_id')
+    if me_id and me_id != target_user.id and is_blocked(me_id, target_user.id):
+        return "Not found", 404
+    user_posts = (Post.query.filter_by(author=username, approved=True)
+                  .order_by(Post.created_at.desc()).all())
+    return render_template('profile.html', target_user=target_user, posts=user_posts, user=current_user())
+
+
+@app.route('/like/<int:post_id>', methods=['POST'])
+def like_post(post_id):
+    if 'user_id' not in session:
+        return {"error": "Unauthorized"}, 401
+    user = current_user()
+    if user is None:
+        return {"error": "Unauthorized"}, 401
+    post = Post.query.get_or_404(post_id)
+
+    existing = Like.query.filter_by(user_id=user.id, post_id=post_id).first()
+    try:
+        if existing:
+            db.session.delete(existing)
+            liked = False
+        else:
+            db.session.add(Like(user_id=user.id, post_id=post_id))
+            notify(post_owner_id(post), user, post, 'like',
+                   f"liked your post: {post.title[:30]}...",
+                   f'❤️ {user.username} liked your post!')
+            liked = True
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"Like error: {e}")
+        return {"error": "Failed"}, 500
+    return {"liked": liked, "count": Like.query.filter_by(post_id=post_id).count()}
+
+
+@app.route('/comment/<int:post_id>', methods=['POST'])
+def add_comment(post_id):
+    if 'user_id' not in session:
+        return {"error": "Unauthorized"}, 401
+    user = current_user()
+    if user is None:
+        return {"error": "Unauthorized"}, 401
+    post = Post.query.get_or_404(post_id)
+
+    data = request.get_json(silent=True) or {}
+    content = (data.get('content') or '').strip()[:500]
+    if not content:
+        return {"error": "Empty comment"}, 400
+
+    new_comment = Comment(post_id=post_id, user_id=user.id, content=content)
+    db.session.add(new_comment)
+    preview = (content[:30] + '...') if len(content) > 30 else content
+    notify(post_owner_id(post), user, post, 'comment',
+           f'commented on your post: "{preview}"',
+           f'💬 {user.username} commented on your post!')
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"Database Error: {e}")
+        return {"error": "Failed to save comment"}, 500
+
+    return {
+        "success": True,
+        "id": new_comment.id,
+        "username": user.username,
+        "profile_pic": user.profile_pic or f"https://ui-avatars.com/api/?name={user.username}",
+        "content": content,
+        "created_at": new_comment.created_at.strftime('%b %d, %I:%M %p')
+    }
+
+
+@app.route('/delete_comment/<int:comment_id>', methods=['POST'])
+def delete_comment(comment_id):
+    if 'user_id' not in session:
+        return jsonify({"success": False, "error": "Please login first"}), 401
+    user = current_user()
+    comment = db.session.get(Comment, comment_id)
+    if not comment:
+        return jsonify({"success": False, "error": "Comment not found"}), 404
+    if comment.user_id == user.id or user.is_admin:
+        try:
+            db.session.delete(comment)
+            db.session.commit()
+            return jsonify({"success": True})
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"success": False, "error": str(e)}), 500
+    return jsonify({"success": False, "error": "Bawal! Dili ni nimo comment."}), 403
+
+
+@app.route('/follow/<int:user_id>', methods=['POST'])
+def follow_user(user_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'unauthorized'}), 401
+    me = session['user_id']
+    if me == user_id:
+        return jsonify({'error': 'cannot follow yourself'}), 400
+    if not db.session.get(User, user_id):
+        return jsonify({'error': 'user not found'}), 404
+    existing = Follow.query.filter_by(follower_id=me, followed_id=user_id).first()
+    if existing:
+        db.session.delete(existing)
+        status = 'unfollowed'
+    else:
+        db.session.add(Follow(follower_id=me, followed_id=user_id))
+        status = 'followed'
+    db.session.commit()
+    return jsonify({'status': status, 'count': get_follower_count(user_id)})
+
+
 # --------------------------------------------------------------------------
-# E) ROUTES: discover / swipe / matches / block / report
+# 5b. ROUTES: DATING (discover / swipe / matches / block / report)
 # --------------------------------------------------------------------------
 @app.route('/discover')
 @login_required
 def discover():
     me = current_user()
+
+    # Karaan nga accounts: kumpletoha una ang dating profile
+    if not me.birthdate or not me.gender:
+        flash("Kumpletoha una imong dating profile (birthdate ug gender).")
+        return redirect(url_for('profile_settings'))
+
     swiped = db.session.query(Swipe.target_id).filter(Swipe.swiper_id == me.id)
     blocked_by_me = db.session.query(Block.blocked_id).filter(Block.blocker_id == me.id)
     blocked_me = db.session.query(Block.blocker_id).filter(Block.blocked_id == me.id)
@@ -206,11 +892,10 @@ def discover():
     # Ang gusto nako
     if me.looking_for in ('male', 'female', 'other'):
         q = q.filter(User.gender == me.looking_for)
-    # Ug ang gusto nila (mutual): dili ka ipakita sa mga dili interesado sa imong gender
-    if me.gender:
-        q = q.filter(or_(User.looking_for == 'everyone',
-                         User.looking_for == me.gender,
-                         User.looking_for.is_(None)))
+    # Ug ang gusto nila (mutual)
+    q = q.filter(or_(User.looking_for == 'everyone',
+                     User.looking_for == me.gender,
+                     User.looking_for.is_(None)))
 
     candidate = q.order_by(func.random()).first()
     return render_template('discover.html', candidate=candidate, user=me)
@@ -288,9 +973,7 @@ def report_user(target_id):
 
 
 # --------------------------------------------------------------------------
-# F) ILISI: inbox() ug send_message()  -- matches ra ang pwede ma-chat
-#    (parehas gihapon ang variables sa messages.html: partners, active_chat,
-#     selected_user, user, active_tab)
+# 6. ROUTES: MESSAGES (matches ra ang pwede ma-chat)
 # --------------------------------------------------------------------------
 @app.route('/messages')
 @app.route('/messages/<int:user_id>')
@@ -348,25 +1031,125 @@ def send_message(receiver_id):
         return "Error sending message.", 500
 
     # Real-time toast sa nakadawat
-    socketio.emit('notify', {'message': f'💬 {me.username}: {content[:40]}', 'type': 'message'},
+    socketio.emit('notify', {'message': f'💬 {me.username}: {content[:40]}', 'type': 'message',
+                             'sender_id': me.id},
                   room=f"user_{receiver_id}")
     return redirect(url_for('inbox', user_id=receiver_id))
 
 
-# --------------------------------------------------------------------------
-# G) IDUGANG sa admin_delete_user()  -- importante!
-#    Kung dili, mo-error ang pag-delete sa user nga naay swipes/matches (foreign key).
-#    Ibutang kini tapad sa Follow.query...delete() line:
-#
-#     Swipe.query.filter((Swipe.swiper_id == user_id) | (Swipe.target_id == user_id)).delete()
-#     Match.query.filter((Match.user_a_id == user_id) | (Match.user_b_id == user_id)).delete()
-#     Block.query.filter((Block.blocker_id == user_id) | (Block.blocked_id == user_id)).delete()
-#     Report.query.filter((Report.reporter_id == user_id) | (Report.reported_id == user_id)).delete()
-# --------------------------------------------------------------------------
+@app.route('/react_message/<int:message_id>', methods=['POST'])
+@login_required
+def react_message(message_id):
+    data = request.get_json(silent=True) or {}
+    reaction = (data.get('reaction') or '')[:20] or None
+    msg = Message.query.get_or_404(message_id)
+    # Sender o receiver ra ang pwede mo-react
+    if session['user_id'] not in (msg.sender_id, msg.receiver_id):
+        return {"status": "forbidden"}, 403
+    msg.reaction = reaction
+    try:
+        db.session.commit()
+        return {"status": "success", "reaction": reaction}, 200
+    except Exception:
+        db.session.rollback()
+        return {"status": "error"}, 500
+
+
+@app.route('/delete_message/<int:message_id>', methods=['GET', 'POST'])
+@login_required
+def delete_message(message_id):
+    message = Message.query.get_or_404(message_id)
+    if message.sender_id == session['user_id']:
+        db.session.delete(message)
+        db.session.commit()
+        return redirect(request.referrer or url_for('inbox'))
+    return "Dili nimo mahimong papason kini.", 403
+
+
+@app.route('/api/unread-count')
+def unread_count():
+    if 'user_id' not in session:
+        return {"count": 0, "messages": 0, "total": 0}
+    uid = session['user_id']
+    notif_count = Notification.query.filter_by(user_id=uid, is_read=False).count()
+    msg_count = Message.query.filter_by(receiver_id=uid, is_read=False).count()
+    return {"count": notif_count, "messages": msg_count, "total": notif_count + msg_count}
 
 
 # --------------------------------------------------------------------------
-# H) DB TABLES: ibutang sa ilawom sa dili pa ang `if __name__ == '__main__':`
+# 7. ROUTES: ADMIN (POST ra, 'admin' account ra)
 # --------------------------------------------------------------------------
-with app.app_context():
-    db.create_all()
+@app.route('/admin/delete_user/<int:user_id>', methods=['POST'])
+@login_required
+@master_admin_required
+def admin_delete_user(user_id):
+    target = db.session.get(User, user_id)
+    if not target:
+        return "User not found", 404
+    if target.username == 'admin':
+        return "Dili ma-delete ang admin.", 400
+    try:
+        # Posts una (ORM delete para mo-cascade ang likes/comments/notifications)
+        for post in Post.query.filter((Post.author_id == user_id) | (Post.author == target.username)).all():
+            db.session.delete(post)
+        db.session.flush()
+        Like.query.filter_by(user_id=user_id).delete()
+        Comment.query.filter_by(user_id=user_id).delete()
+        Reaction.query.filter_by(user_id=user_id).delete()
+        Follow.query.filter((Follow.follower_id == user_id) | (Follow.followed_id == user_id)).delete()
+        # Dating tables
+        Swipe.query.filter((Swipe.swiper_id == user_id) | (Swipe.target_id == user_id)).delete()
+        Match.query.filter((Match.user_a_id == user_id) | (Match.user_b_id == user_id)).delete()
+        Block.query.filter((Block.blocker_id == user_id) | (Block.blocked_id == user_id)).delete()
+        Report.query.filter((Report.reporter_id == user_id) | (Report.reported_id == user_id)).delete()
+        Notification.query.filter((Notification.user_id == user_id) | (Notification.sender_id == user_id)).delete()
+        # Message replies: i-null ang parent_id sa mga naka-reply sa iyang messages
+        own_ids = [m.id for m in Message.query.filter(
+            (Message.sender_id == user_id) | (Message.receiver_id == user_id)).all()]
+        if own_ids:
+            Message.query.filter(Message.parent_id.in_(own_ids)).update({Message.parent_id: None}, synchronize_session=False)
+        Message.query.filter((Message.sender_id == user_id) | (Message.receiver_id == user_id)).delete()
+        db.session.delete(target)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"DATABASE ERROR: {e}")
+        return f"Error: {e}", 500
+    return redirect(url_for('dashboard'))
+
+
+@app.route('/admin/delete_message/<int:msg_id>', methods=['POST'])
+@login_required
+@master_admin_required
+def admin_delete_message(msg_id):
+    msg = db.session.get(Message, msg_id)
+    if not msg:
+        return "Message not found", 404
+    try:
+        Message.query.filter_by(parent_id=msg_id).update({Message.parent_id: None})
+        db.session.delete(msg)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"DATABASE ERROR: {e}")
+        return f"Error: {e}", 500
+    return redirect(url_for('dashboard'))
+
+
+# --------------------------------------------------------------------------
+# 8. PWA FILES
+# --------------------------------------------------------------------------
+@app.route('/sw.js')
+def serve_sw():
+    return send_from_directory('static', 'sw.js', mimetype='application/javascript')
+
+
+@app.route('/manifest.json')
+def serve_manifest():
+    return send_from_directory('static', 'manifest.json')
+
+
+if __name__ == '__main__':
+    # Local lang ni. Sa Render, gunicorn ang mo-run: gunicorn -k eventlet -w 1 app:app
+    socketio.run(app, debug=os.environ.get("DEBUG") == "1", host='0.0.0.0',
+                 port=int(os.environ.get("PORT", 5000)))
