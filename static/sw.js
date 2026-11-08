@@ -4,7 +4,7 @@
 // - POST, socket.io, api, ug laing sites (Cloudinary etc.): dili hilabtan
 const CACHE = 'se7en-v1';
 const OFFLINE_URL = '/static/offline.html';
-const PRECACHE = [OFFLINE_URL, '/static/icons/icon-192.png', '/static/icons/icon-512.png'];
+const PRECACHE = [OFFLINE_URL, '/static/icon-192.png', '/static/icon-512.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -23,6 +23,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
+  if (req.headers.has('range')) return;   // audio/video (mp3): ayaw hilabti
 
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
