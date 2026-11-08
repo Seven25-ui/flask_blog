@@ -59,6 +59,14 @@
                 </p>
             </div>
 
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="bg-red-500/10 text-red-400 p-4 rounded-2xl text-[11px] mb-6 border border-red-500/20 font-bold">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
             <form method="POST" enctype="multipart/form-data" class="space-y-8">
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -95,10 +103,19 @@
                            class="w-full px-5 py-4 rounded-2xl text-gray-200 text-sm transition-all">
                 </div>
 
+                {% if not user.birthdate %}
+                <div>
+                    <label class="block text-[10px] font-black text-gray-500 mb-3 uppercase tracking-widest">Birthdate (18+ only, usa ra ni ma-set)</label>
+                    <input type="date" name="birthdate" required
+                           class="w-full px-5 py-4 rounded-2xl bg-black border border-gray-800 text-gray-200 text-sm transition-all" style="color-scheme: dark;">
+                </div>
+                {% endif %}
+
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                         <label class="block text-[10px] font-black text-gray-500 mb-3 uppercase tracking-widest">I am</label>
-                        <select name="gender" class="w-full px-4 py-4 rounded-2xl text-gray-200 text-sm">
+                        <select name="gender" required class="w-full px-4 py-4 rounded-2xl text-gray-200 text-sm">
+                            <option value="" disabled {{ 'selected' if not user.gender }}>Select</option>
                             <option value="male" {{ 'selected' if user.gender == 'male' }}>Male</option>
                             <option value="female" {{ 'selected' if user.gender == 'female' }}>Female</option>
                             <option value="other" {{ 'selected' if user.gender == 'other' }}>Other</option>
