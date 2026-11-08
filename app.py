@@ -10,6 +10,15 @@ from functools import wraps
 import cloudinary
 import cloudinary.uploader
 from flask_socketio import SocketIO, join_room
+import json
+import threading
+
+# Web Push (optional: kung wala pa ma-install ang pywebpush, mo-boot gihapon ang app)
+try:
+    from pywebpush import webpush, WebPushException
+except ImportError:
+    webpush = None
+    WebPushException = Exception
 
 # Para lang sa local nga pagtrabaho (.env file). Sa Render, Environment Variables ang gamit.
 try:
@@ -66,6 +75,11 @@ app.config['SQLALCHEMY_DATABASE_URI'] = fix_uri(require_env("DATABASE_URL"))
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {"pool_pre_ping": True, "pool_recycle": 280}
 db = SQLAlchemy(app)
+
+# Web Push keys (ibutang sa Render -> Environment; ayaw i-commit sa GitHub)
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
+VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "https://flask-blog-v2.onrender.com")
 
 
 # --------------------------------------------------------------------------
@@ -200,6 +214,15 @@ class Report(db.Model):
     created_at = db.Column(db.DateTime, default=ph_time)
 
 
+class PushSubscription(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    endpoint = db.Column(db.Text, unique=True, nullable=False)
+    p256dh = db.Column(db.String(200), nullable=False)
+    auth = db.Column(db.String(100), nullable=False)
+    created_at = db.Column(db.DateTime, default=ph_time)
+
+
 # --------------------------------------------------------------------------
 # 1b. DATABASE SETUP (luwas sa existing database)
 #     - create_all(): mo-create ra sa bag-ong tables (Swipe, Match, Block, Report)
@@ -317,6 +340,45 @@ def post_owner_id(post):
     return owner.id if owner else None
 
 
+def _push_worker(user_id, payload):
+    """Mo-padala sa push sa tanang devices sa user (naka-run sa background thread)."""
+    with app.app_context():
+        try:
+            subs = PushSubscription.query.filter_by(user_id=user_id).all()
+            for s in subs:
+                try:
+                    webpush(
+                        subscription_info={"endpoint": s.endpoint,
+                                           "keys": {"p256dh": s.p256dh, "auth": s.auth}},
+                        data=payload,
+                        vapid_private_key=VAPID_PRIVATE_KEY,
+                        vapid_claims={"sub": VAPID_SUBJECT},
+                        ttl=86400,
+                    )
+                except WebPushException as e:
+                    status = getattr(getattr(e, 'response', None), 'status_code', None)
+                    if status in (404, 410):          # patay na nga subscription
+                        db.session.delete(s)
+                    else:
+                        print(f"Push error ({status}): {e}")
+                except Exception as e:
+                    print(f"Push error: {e}")
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"Push worker error: {e}")
+        finally:
+            db.session.remove()
+
+
+def send_push_async(user_id, title, body, url='/'):
+    """Mo-padala ug phone notification (kung naka-enable ang user ug naka-set ang VAPID keys)."""
+    if not user_id or webpush is None or not (VAPID_PRIVATE_KEY and VAPID_PUBLIC_KEY):
+        return
+    payload = json.dumps({"title": title, "body": (body or '')[:140], "url": url})
+    threading.Thread(target=_push_worker, args=(user_id, payload), daemon=True).start()
+
+
 def notify(owner_id, sender, post, notif_type, text_msg, toast):
     """I-save ang notification ug i-emit ang real-time signal (kung dili iya kaugalingon)."""
     if not owner_id or owner_id == sender.id:
@@ -324,6 +386,7 @@ def notify(owner_id, sender, post, notif_type, text_msg, toast):
     db.session.add(Notification(user_id=owner_id, sender_id=sender.id, post_id=post.id,
                                 notif_type=notif_type, message=text_msg))
     socketio.emit('notify', {'message': toast, 'type': notif_type}, room=f"user_{owner_id}")
+    send_push_async(owner_id, 'SE7EN', f"{sender.username} {text_msg}", '/notifications')
 
 
 def upload_media(file, allow_video=True):
@@ -938,6 +1001,8 @@ def swipe(target_id):
                       room=f"user_{target_id}")
         socketio.emit('notify', {'message': f"💘 It's a match with {other.username}!", 'type': 'match'},
                       room=f"user_{me.id}")
+        send_push_async(target_id, "It's a match! 💘", f"Nag-match mo ni {me.username}. Pagsugod ug hi!", '/matches')
+        send_push_async(me.id, "It's a match! 💘", f"Nag-match mo ni {other.username}.", '/matches')
         return {"matched": True, "username": other.username}
     return {"matched": False}
 
@@ -1034,6 +1099,7 @@ def send_message(receiver_id):
     socketio.emit('notify', {'message': f'💬 {me.username}: {content[:40]}', 'type': 'message',
                              'sender_id': me.id},
                   room=f"user_{receiver_id}")
+    send_push_async(receiver_id, me.username, content, f'/messages/{me.id}')
     return redirect(url_for('inbox', user_id=receiver_id))
 
 
@@ -1102,6 +1168,7 @@ def admin_delete_user(user_id):
         Match.query.filter((Match.user_a_id == user_id) | (Match.user_b_id == user_id)).delete()
         Block.query.filter((Block.blocker_id == user_id) | (Block.blocked_id == user_id)).delete()
         Report.query.filter((Report.reporter_id == user_id) | (Report.reported_id == user_id)).delete()
+        PushSubscription.query.filter_by(user_id=user_id).delete()
         Notification.query.filter((Notification.user_id == user_id) | (Notification.sender_id == user_id)).delete()
         # Message replies: i-null ang parent_id sa mga naka-reply sa iyang messages
         own_ids = [m.id for m in Message.query.filter(
@@ -1152,6 +1219,49 @@ def serve_manifest():
     return send_from_directory('static', 'manifest.json', mimetype='application/manifest+json')
 
 
+# --- Web Push routes ---
+@app.route('/push/public-key')
+def push_public_key():
+    # 401 kung wala naka-login o wala pa naka-set ang VAPID keys (mo-hunong ang push.js)
+    if 'user_id' not in session or webpush is None or not VAPID_PUBLIC_KEY:
+        return {"error": "unavailable"}, 401
+    return {"key": VAPID_PUBLIC_KEY}
+
+
+@app.route('/push/subscribe', methods=['POST'])
+@login_required
+def push_subscribe():
+    data = request.get_json(silent=True) or {}
+    endpoint = data.get('endpoint')
+    keys = data.get('keys') or {}
+    p256dh, auth = keys.get('p256dh'), keys.get('auth')
+    if not (endpoint and p256dh and auth):
+        return {"error": "invalid"}, 400
+    try:
+        sub = PushSubscription.query.filter_by(endpoint=endpoint).first()
+        if sub:                                   # parehas nga device, i-update ang tag-iya
+            sub.user_id, sub.p256dh, sub.auth = session['user_id'], p256dh, auth
+        else:
+            db.session.add(PushSubscription(user_id=session['user_id'], endpoint=endpoint,
+                                            p256dh=p256dh, auth=auth))
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"Subscribe error: {e}")
+        return {"error": "failed"}, 500
+    return {"status": "subscribed"}
+
+
+@app.route('/push/unsubscribe', methods=['POST'])
+@login_required
+def push_unsubscribe():
+    endpoint = (request.get_json(silent=True) or {}).get('endpoint')
+    if endpoint:
+        PushSubscription.query.filter_by(endpoint=endpoint, user_id=session['user_id']).delete()
+        db.session.commit()
+    return {"status": "unsubscribed"}
+
+
 # I-inject ang PWA tags sa TANANG HTML pages (wala na kinahanglan usbon ang matag template)
 PWA_SNIPPET = (
     '<link rel="manifest" href="/manifest.json">'
@@ -1160,6 +1270,7 @@ PWA_SNIPPET = (
     '<meta name="apple-mobile-web-app-capable" content="yes">'
     '<meta name="apple-mobile-web-app-status-bar-style" content="black">'
     '<link rel="apple-touch-icon" href="/static/icon-192.png">'
+    '<script src="/static/push.js" defer></script>'
     '<script>if("serviceWorker" in navigator){window.addEventListener("load",function(){'
     'navigator.serviceWorker.register("/sw.js").catch(function(){});});}</script>'
 )
