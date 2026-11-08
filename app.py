@@ -10,7 +10,6 @@ from functools import wraps
 import cloudinary
 import cloudinary.uploader
 from flask_socketio import SocketIO, join_room
-import eventlet  # gikinahanglan sa async_mode='eventlet'
 
 # Para lang sa local nga pagtrabaho (.env file). Sa Render, Environment Variables ang gamit.
 try:
@@ -38,10 +37,11 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'                 # panalipod sa CSR
 app.config['SESSION_COOKIE_SECURE'] = bool(os.environ.get("RENDER"))
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 
-# SocketIO (eventlet para sa Render). Pwede nimo i-limit ang origin: ALLOWED_ORIGINS=https://flask-blog-v2.onrender.com
+# SocketIO (threading mode: mo-work sa Python 3.13, wala nay eventlet).
+# Pwede nimo i-limit ang origin: ALLOWED_ORIGINS=https://flask-blog-v2.onrender.com
 socketio = SocketIO(app,
                     cors_allowed_origins=os.environ.get("ALLOWED_ORIGINS", "*"),
-                    async_mode='eventlet')
+                    async_mode='threading')
 
 
 def ph_time():
@@ -1150,6 +1150,7 @@ def serve_manifest():
 
 
 if __name__ == '__main__':
-    # Local lang ni. Sa Render, gunicorn ang mo-run: gunicorn -k eventlet -w 1 app:app
+    # Local lang ni. Sa Render, gunicorn ang mo-run:
+    #   gunicorn --worker-class gthread --threads 100 -w 1 --bind 0.0.0.0:$PORT app:app
     socketio.run(app, debug=os.environ.get("DEBUG") == "1", host='0.0.0.0',
-                 port=int(os.environ.get("PORT", 5000)))
+                 port=int(os.environ.get("PORT", 5000)), allow_unsafe_werkzeug=True)
