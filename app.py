@@ -1142,6 +1142,37 @@ def unread_count():
     return {"count": notif_count, "messages": msg_count, "total": notif_count + msg_count}
 
 
+# --- TEMPORARY: para sa pag-test sa matching. I-DELETE kini nga route kung tapos na ang test. ---
+@app.route('/dating-debug')
+@login_required
+def dating_debug():
+    me = current_user()
+
+    # ?reset=1 : i-delete ang swipes/matches nga naay labot sa imo (para ma-test balik)
+    if request.args.get('reset') == '1':
+        Swipe.query.filter((Swipe.swiper_id == me.id) | (Swipe.target_id == me.id)).delete()
+        Match.query.filter((Match.user_a_id == me.id) | (Match.user_b_id == me.id)).delete()
+        db.session.commit()
+        return redirect(url_for('dating_debug'))
+
+    my_swipes = [[s.target_id, s.liked] for s in Swipe.query.filter_by(swiper_id=me.id).all()]
+    liked_me = [s.swiper_id for s in Swipe.query.filter_by(target_id=me.id, liked=True).all()]
+    my_matches = [[m.user_a_id, m.user_b_id] for m in Match.query.filter(
+        or_(Match.user_a_id == me.id, Match.user_b_id == me.id)).all()]
+    others = (User.query.filter(User.id != me.id, User.username != 'admin')
+              .order_by(User.id.desc()).limit(10).all())
+    return {
+        "me": {"id": me.id, "username": me.username, "gender": me.gender,
+               "looking_for": me.looking_for, "has_birthdate": bool(me.birthdate)},
+        "my_swipes [target_id, liked]": my_swipes,
+        "who_liked_me": liked_me,
+        "my_matches": my_matches,
+        "latest_other_users": [{"id": u.id, "username": u.username, "gender": u.gender,
+                                "looking_for": u.looking_for, "has_birthdate": bool(u.birthdate)}
+                               for u in others],
+    }
+
+
 # --------------------------------------------------------------------------
 # 7. ROUTES: ADMIN (POST ra, 'admin' account ra)
 # --------------------------------------------------------------------------
