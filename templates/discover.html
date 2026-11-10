@@ -56,9 +56,24 @@
       return r.json();
     }
     async function swipe(liked){
-      const d = await post('/swipe/'+targetId,{liked});
-      if(d.matched){ toast("💘 It's a match with "+d.username+"!"); setTimeout(()=>location.reload(),1800); }
-      else location.reload();
+      try {
+        const r = await fetch('/swipe/'+targetId, {
+          method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({liked})
+        });
+        const d = await r.json();
+        if (!r.ok || d.error) { toast('Error: ' + (d.error || r.status)); return; }
+        if (d.matched) {
+          toast("💘 It's a match with " + d.username + "!");
+          setTimeout(() => location.reload(), 1800);
+        } else if (liked) {
+          toast('❤ Na-like na. Hulat nato kung mo-like pud siya pabalik.');
+          setTimeout(() => location.reload(), 1300);
+        } else {
+          location.reload();
+        }
+      } catch (e) {
+        toast('Naay error o walay connection. Sulayi pag-usab.');
+      }
     }
     async function blockUser(){
       if(!confirm('Block kini nga user?')) return;
