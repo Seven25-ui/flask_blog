@@ -1,7 +1,7 @@
 from flask import (Flask, render_template, redirect, url_for, request, session,
                    flash, jsonify, send_from_directory)
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import or_, and_, func, text
+from sqlalchemy import or_, and_, func, text, case
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import re
@@ -1012,6 +1012,90 @@ def swipe(target_id):
 def matches():
     me = current_user()
     return render_template('matches.html', people=match_partners(me.id), user=me)
+
+
+def like_escape(s):
+    """I-escape ang %, _ ug \\ aron dili mo-tuo-tuo nga wildcard ang gi-type sa user."""
+    return s.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+
+
+def years_ago(years):
+    t = ph_time().date()
+    try:
+        return t.replace(year=t.year - years)
+    except ValueError:                      # Feb 29
+        return t.replace(year=t.year - years, day=28)
+
+
+@app.route('/search')
+def search():
+    me = current_user()
+    q = (request.args.get('q') or '').strip()[:60]
+    tab = request.args.get('tab', 'people')
+    if tab not in ('people', 'posts'):
+        tab = 'people'
+    gender = request.args.get('gender', '')
+    if gender not in ('male', 'female', 'other'):
+        gender = ''
+    min_age = request.args.get('min_age', type=int)
+    max_age = request.args.get('max_age', type=int)
+    if min_age is not None and not (18 <= min_age <= 100):
+        min_age = None
+    if max_age is not None and not (18 <= max_age <= 100):
+        max_age = None
+
+    people, posts = [], []
+    need_login = False
+    has_filters = bool(gender or min_age or max_age)
+    searched = bool(q) or (tab == 'people' and has_filters)
+
+    blocked_ids = []
+    if me:
+        blocked_ids = [b.blocked_id for b in Block.query.filter_by(blocker_id=me.id).all()] + \
+                      [b.blocker_id for b in Block.query.filter_by(blocked_id=me.id).all()]
+
+    if tab == 'people':
+        if not me:
+            need_login = True                      # dating profiles: login una
+        elif searched:
+            term = q.lstrip('@#')
+            pq = User.query.filter(User.birthdate.isnot(None),
+                                   User.username != 'admin',
+                                   User.id != me.id)
+            if blocked_ids:
+                pq = pq.filter(~User.id.in_(blocked_ids))
+            order = []
+            if term:
+                pat = f"%{like_escape(term)}%"
+                pq = pq.filter(or_(User.username.ilike(pat, escape='\\'),
+                                   User.bio.ilike(pat, escape='\\'),
+                                   User.interests.ilike(pat, escape='\\'),
+                                   User.location_text.ilike(pat, escape='\\')))
+                order.append(case((User.username.ilike(f"{like_escape(term)}%", escape='\\'), 0), else_=1))
+            if gender:
+                pq = pq.filter(User.gender == gender)
+            if min_age:
+                pq = pq.filter(User.birthdate <= years_ago(min_age))
+            if max_age:
+                pq = pq.filter(User.birthdate > years_ago(max_age + 1))
+            people = pq.order_by(*order, User.last_seen.desc()).limit(30).all()
+    else:
+        if searched:
+            term = q.lstrip('#')
+            tq = Post.query.filter_by(approved=True)
+            if blocked_ids:
+                tq = tq.filter(or_(Post.author_id.is_(None), ~Post.author_id.in_(blocked_ids)))
+            if term:
+                pat = f"%{like_escape(term)}%"
+                tq = tq.filter(or_(Post.title.ilike(pat, escape='\\'),
+                                   Post.content.ilike(pat, escape='\\'),
+                                   Post.hashtags.ilike(pat, escape='\\'),
+                                   Post.author.ilike(pat, escape='\\')))
+            posts = tq.order_by(Post.created_at.desc()).limit(30).all()
+
+    return render_template('search.html', user=me, q=q, tab=tab, people=people, posts=posts,
+                           gender=gender, min_age=min_age, max_age=max_age,
+                           need_login=need_login, searched=searched)
 
 
 @app.route('/block/<int:target_id>', methods=['POST'])
