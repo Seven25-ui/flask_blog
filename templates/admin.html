@@ -21,13 +21,16 @@
             backdrop-filter: blur(12px);
             border: 1px solid #1f2937;
         }
-        .status-pulse {
-            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
+        .status-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
+        .tab-btn { transition: all .2s; }
+        .tab-active { color: #0ea5e9; border-bottom: 2px solid #0ea5e9; }
     </style>
 </head>
 <body class="min-h-screen">
+
+    <!-- Tago nga form: tanang delete/dismiss actions mo-POST ani (ang routes POST ra) -->
+    <form id="actionForm" method="POST" style="display:none"></form>
 
     <nav class="glass-card border-x-0 border-t-0 sticky top-0 z-50 px-6 py-4">
         <div class="max-w-7xl mx-auto flex justify-between items-center">
@@ -36,39 +39,39 @@
                 <span class="bg-red-500/10 border border-red-500/20 text-red-500 text-[10px] font-black px-3 py-1 rounded-full tracking-[0.2em]">MASTER ADMIN</span>
             </div>
             <div class="flex items-center gap-3">
-                <a href="{{ url_for('inbox') }}" class="flex items-center gap-2 bg-sky-500 hover:bg-sky-400 px-5 py-2 rounded-xl text-xs font-black text-white transition-all transform active:scale-95 uppercase tracking-widest shadow-lg shadow-sky-500/20">
-                    <i class="fa-solid fa- terminal mr-1"></i> Return to System
+                <a href="{{ url_for('public_home') }}" class="flex items-center gap-2 bg-sky-500 hover:bg-sky-400 px-5 py-2 rounded-xl text-xs font-black text-white transition-all transform active:scale-95 uppercase tracking-widest shadow-lg shadow-sky-500/20">
+                    <i class="fa-solid fa-terminal mr-1"></i> Return to System
                 </a>
+                <a href="{{ url_for('logout') }}" class="px-4 py-2 rounded-xl text-xs font-black text-gray-400 hover:text-white border border-gray-800 uppercase tracking-widest">Logout</a>
             </div>
         </div>
     </nav>
 
     <main class="max-w-7xl mx-auto p-6 lg:p-10 space-y-10">
 
+        <!-- STATS -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
             <div class="glass-card p-6 rounded-[2rem] hover:border-sky-500/50 transition-colors">
-                <p class="text-[10px] text-gray-500 uppercase font-black tracking-[0.2em]">Nodes Active</p>
+                <p class="text-[10px] text-gray-500 uppercase font-black tracking-[0.2em]">Users</p>
                 <h3 class="text-4xl font-black mt-2 text-white">{{ users|length }}</h3>
             </div>
+            <div class="glass-card p-6 rounded-[2rem] hover:border-pink-500/50 transition-colors">
+                <p class="text-[10px] text-gray-500 uppercase font-black tracking-[0.2em]">Matches</p>
+                <h3 class="text-4xl font-black mt-2 text-white">{{ match_total }}</h3>
+            </div>
+            <div class="glass-card p-6 rounded-[2rem] {{ 'border-red-500/50' if reports }} transition-colors">
+                <p class="text-[10px] text-gray-500 uppercase font-black tracking-[0.2em]">Open Reports</p>
+                <h3 class="text-4xl font-black mt-2 {{ 'text-red-500' if reports else 'text-white' }}">{{ reports|length }}</h3>
+            </div>
             <div class="glass-card p-6 rounded-[2rem] hover:border-purple-500/50 transition-colors">
-                <p class="text-[10px] text-gray-500 uppercase font-black tracking-[0.2em]">Data Packets</p>
-                <h3 class="text-4xl font-black mt-2 text-white">{{ messages|length }}</h3>
-            </div>
-            <div class="glass-card p-6 rounded-[2rem]">
-                <p class="text-[10px] text-gray-500 uppercase font-black tracking-[0.2em]">Uptime Status</p>
-                <div class="flex items-center gap-2 mt-4 text-green-500">
-                    <div class="h-2 w-2 rounded-full bg-green-500 status-pulse"></div>
-                    <span class="text-[11px] font-black tracking-widest uppercase">Singapore-1 Online</span>
-                </div>
-            </div>
-            <div class="glass-card p-6 rounded-[2rem]">
-                <p class="text-[10px] text-gray-500 uppercase font-black tracking-[0.2em]">Core DB</p>
-                <h3 class="text-[11px] font-black mt-4 text-sky-400 tracking-widest uppercase underline underline-offset-4 decoration-2">Neon Instance</h3>
+                <p class="text-[10px] text-gray-500 uppercase font-black tracking-[0.2em]">Messages</p>
+                <h3 class="text-4xl font-black mt-2 text-white">{{ message_total }}</h3>
             </div>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
-            
+
+            <!-- USERS -->
             <div class="lg:col-span-2 space-y-6">
                 <div class="glass-card rounded-[2.5rem] overflow-hidden">
                     <div class="p-8 border-b border-gray-900 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -87,38 +90,48 @@
                             <thead class="bg-gray-900/30 text-[10px] uppercase font-black text-gray-500 tracking-[0.2em]">
                                 <tr>
                                     <th class="px-8 py-5">Identity Profile</th>
-                                    <th class="px-8 py-5">Access Level</th>
+                                    <th class="px-8 py-5">Status</th>
                                     <th class="px-8 py-5 text-right">Termination</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-900">
-                                {% for user in users %}
+                                {% for u in users %}
                                 <tr class="hover:bg-sky-500/[0.02] transition user-row">
                                     <td class="px-8 py-6">
                                         <div class="flex items-center gap-3">
-                                            <div class="h-8 w-8 rounded-full bg-gray-800 flex items-center justify-center text-[10px] font-black text-sky-500">
-                                                {{ user.username[:2]|upper }}
+                                            {% if u.profile_pic %}
+                                            <img src="{{ u.profile_pic }}" alt="" class="h-9 w-9 rounded-full object-cover border border-gray-800">
+                                            {% else %}
+                                            <div class="h-9 w-9 rounded-full bg-gray-800 flex items-center justify-center text-[10px] font-black text-sky-500">
+                                                {{ u.username[:2]|upper }}
                                             </div>
+                                            {% endif %}
                                             <div>
                                                 <div class="flex items-center gap-2">
-                                                    <span class="font-bold text-white text-sm tracking-tight">{{ user.username }}</span>
-                                                    {% if user.username == 'admin' %}
-                                                        <i class="fa-solid fa-shield-check text-sky-500 text-[10px]" title="Root Admin"></i>
+                                                    <a href="{{ url_for('user_profile', username=u.username) }}" class="font-bold text-white text-sm tracking-tight hover:text-sky-400">{{ u.username }}</a>
+                                                    {% if u.username == 'admin' %}
+                                                        <i class="fa-solid fa-shield-halved text-sky-500 text-[10px]" title="Root Admin"></i>
                                                     {% endif %}
                                                 </div>
-                                                <div class="text-[10px] text-gray-600 font-bold uppercase tracking-tighter">{{ user.email }}</div>
+                                                <div class="text-[10px] text-gray-600 font-bold uppercase tracking-tighter">
+                                                    {% if u.gender %}{{ u.gender }}{% else %}walay gender{% endif %}
+                                                    {% if u.birthdate %} • {{ calc_age(u.birthdate) }}{% else %} • walay birthdate{% endif %}
+                                                    {% if u.location_text %} • {{ u.location_text }}{% endif %}
+                                                </div>
                                             </div>
                                         </div>
                                     </td>
                                     <td class="px-8 py-6">
-                                        {% if user.username == 'admin' %}
+                                        {% if u.username == 'admin' %}
                                             <span class="px-3 py-1 bg-sky-500/10 text-sky-500 text-[9px] font-black rounded-lg border border-sky-500/20 tracking-widest uppercase italic">ROOT</span>
+                                        {% elif report_counts.get(u.id) %}
+                                            <span class="px-3 py-1 bg-red-500/10 text-red-500 text-[9px] font-black rounded-lg border border-red-500/20 tracking-widest uppercase">REPORTED ×{{ report_counts.get(u.id) }}</span>
                                         {% else %}
-                                            <span class="px-3 py-1 bg-green-500/10 text-green-500 text-[9px] font-black rounded-lg border border-green-500/20 tracking-widest uppercase">ACTIVE_NODE</span>
+                                            <span class="px-3 py-1 bg-green-500/10 text-green-500 text-[9px] font-black rounded-lg border border-green-500/20 tracking-widest uppercase">ACTIVE</span>
                                         {% endif %}
                                     </td>
                                     <td class="px-8 py-6 text-right">
-                                        <button onclick="confirmDelete('{{ user.id }}', '{{ user.username }}')" 
+                                        <button onclick="confirmDelete('{{ u.id }}', '{{ u.username|e }}')" 
                                                 class="h-9 w-9 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all transform active:scale-90 flex items-center justify-center ml-auto border border-red-500/20">
                                             <i class="fa-solid fa-bolt-lightning text-xs"></i>
                                         </button>
@@ -131,39 +144,122 @@
                 </div>
             </div>
 
+            <!-- REPORTS / MESSAGES -->
             <div class="glass-card rounded-[2.5rem] flex flex-col h-[750px]">
-                <div class="p-8 border-b border-gray-900">
-                    <h2 class="brand-font text-lg font-black flex items-center gap-3 text-purple-500 uppercase tracking-tighter">
-                        <i class="fa-solid fa-satellite-dish"></i> Live Stream
-                    </h2>
-                    <input type="text" id="msgSearch" placeholder="Scan traffic content..."
-                                class="w-full mt-6 px-4 py-3 bg-black border border-gray-800 rounded-2xl text-[11px] font-bold focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all outline-none">
+                <div class="px-8 pt-8 border-b border-gray-900">
+                    <div class="flex gap-6">
+                        <button id="tab-reports" onclick="showTab('reports')"
+                                class="tab-btn tab-active pb-4 text-[11px] font-black uppercase tracking-widest">
+                            <i class="fa-solid fa-flag mr-1"></i> Reports
+                            {% if reports %}<span class="ml-1 bg-red-500 text-white rounded-full px-2 py-0.5 text-[9px]">{{ reports|length }}</span>{% endif %}
+                        </button>
+                        <button id="tab-messages" onclick="showTab('messages')"
+                                class="tab-btn pb-4 text-[11px] font-black uppercase tracking-widest text-gray-500">
+                            <i class="fa-solid fa-satellite-dish mr-1"></i> Messages
+                        </button>
+                    </div>
                 </div>
-                
-                <div class="flex-1 overflow-y-auto p-6 space-y-4 hide-scroll" id="messageList">
-                    {% for msg in messages %}
-                    <div class="p-5 bg-gray-900/20 rounded-2xl border border-gray-900 hover:border-purple-500/30 transition group msg-item relative overflow-hidden">
-                        <div class="flex justify-between items-start mb-3">
-                            <div>
-                                <span class="text-[10px] font-black text-sky-500 uppercase tracking-[0.1em]">
-                                    {{ msg.sender.username }}
-                                </span>
-                                <div class="text-[9px] text-gray-700 font-bold uppercase mt-1 tracking-tighter">{{ msg.timestamp }}</div>
+
+                <!-- Reports -->
+                <div class="flex-1 overflow-y-auto p-6 space-y-4 hide-scroll" id="reportList">
+                    {% if not reports %}
+                    <div class="text-center py-16 opacity-60">
+                        <p class="text-4xl mb-3">✅</p>
+                        <p class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">Walay report.</p>
+                    </div>
+                    {% endif %}
+
+                    {% for r in reports %}
+                    <div class="p-5 bg-red-500/[0.03] rounded-2xl border border-red-500/20">
+                        <div class="flex justify-between items-start gap-3 mb-3">
+                            <div class="min-w-0">
+                                <div class="text-[10px] font-black uppercase tracking-widest text-red-400">
+                                    {% if r.reported %}
+                                    <a href="{{ url_for('user_profile', username=r.reported.username) }}" class="hover:underline">@{{ r.reported.username }}</a>
+                                    {% else %}(na-delete na){% endif %}
+                                    {% if r.times > 1 %}<span class="ml-1 text-gray-500">• {{ r.times }} ka report</span>{% endif %}
+                                </div>
+                                <div class="text-[9px] text-gray-600 font-bold uppercase mt-1 tracking-tighter">
+                                    gikan kang {{ ('@' ~ r.reporter.username) if r.reporter else '(na-delete na)' }}
+                                    • {{ r.created_at.strftime('%b %d, %I:%M %p') if r.created_at else '' }}
+                                </div>
                             </div>
-                            <button onclick="confirmDeleteMessage('{{ msg.id }}')" 
-                                    class="opacity-0 group-hover:opacity-100 text-red-500/60 hover:text-red-500 transition-all p-2 bg-red-500/5 rounded-lg">
-                                <i class="fa-solid fa-trash-can text-[10px]"></i>
-                            </button>
                         </div>
-                        <p class="text-xs text-gray-400 leading-relaxed msg-content font-medium italic">"{{ msg.content }}"</p>
+                        <p class="text-xs text-gray-300 leading-relaxed font-medium">"{{ r.reason }}"</p>
+                        <div class="flex gap-2 mt-4">
+                            <button onclick="dismissReport('{{ r.id }}')"
+                                    class="flex-1 py-2 rounded-xl bg-gray-900 text-gray-300 hover:bg-gray-800 text-[10px] font-black uppercase tracking-widest border border-gray-800 transition">
+                                Dismiss
+                            </button>
+                            {% if r.reported and r.reported.username != 'admin' %}
+                            <button onclick="confirmDelete('{{ r.reported.id }}', '{{ r.reported.username|e }}')"
+                                    class="flex-1 py-2 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white text-[10px] font-black uppercase tracking-widest border border-red-500/20 transition">
+                                Delete user
+                            </button>
+                            {% endif %}
+                        </div>
                     </div>
                     {% endfor %}
+                </div>
+
+                <!-- Messages (pinakabag-o nga 100 ra) -->
+                <div class="hidden flex-1 overflow-hidden flex-col" id="messagePanel">
+                    <div class="px-6 pt-6">
+                        <input type="text" id="msgSearch" placeholder="Scan traffic content..."
+                               class="w-full px-4 py-3 bg-black border border-gray-800 rounded-2xl text-[11px] font-bold focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all outline-none">
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-6 space-y-4 hide-scroll" id="messageList">
+                        {% for msg in messages %}
+                        <div class="p-5 bg-gray-900/20 rounded-2xl border border-gray-900 hover:border-purple-500/30 transition group msg-item relative overflow-hidden">
+                            <div class="flex justify-between items-start mb-3">
+                                <div>
+                                    <span class="text-[10px] font-black text-sky-500 uppercase tracking-[0.1em]">
+                                        {{ msg.sender.username if msg.sender else '?' }}
+                                        <span class="text-gray-600">→ {{ msg.receiver.username if msg.receiver else '?' }}</span>
+                                    </span>
+                                    <div class="text-[9px] text-gray-700 font-bold uppercase mt-1 tracking-tighter">
+                                        {{ msg.created_at.strftime('%b %d, %I:%M %p') if msg.created_at else '' }}
+                                    </div>
+                                </div>
+                                <button onclick="confirmDeleteMessage('{{ msg.id }}')" 
+                                        class="opacity-0 group-hover:opacity-100 text-red-500/60 hover:text-red-500 transition-all p-2 bg-red-500/5 rounded-lg">
+                                    <i class="fa-solid fa-trash-can text-[10px]"></i>
+                                </button>
+                            </div>
+                            <p class="text-xs text-gray-400 leading-relaxed msg-content font-medium italic">"{{ msg.content }}"</p>
+                        </div>
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
         </div>
     </main>
 
     <script>
+        // Tanang actions mo-POST (kay POST ra ang routes sa app.py)
+        function postTo(url) {
+            const f = document.getElementById('actionForm');
+            f.action = url;
+            f.submit();
+        }
+
+        // Tabs
+        function showTab(name) {
+            const reports = document.getElementById('reportList');
+            const msgs = document.getElementById('messagePanel');
+            const tr = document.getElementById('tab-reports');
+            const tm = document.getElementById('tab-messages');
+            if (name === 'reports') {
+                reports.classList.remove('hidden'); msgs.classList.add('hidden'); msgs.classList.remove('flex');
+                tr.classList.add('tab-active'); tr.classList.remove('text-gray-500');
+                tm.classList.remove('tab-active'); tm.classList.add('text-gray-500');
+            } else {
+                reports.classList.add('hidden'); msgs.classList.remove('hidden'); msgs.classList.add('flex');
+                tm.classList.add('tab-active'); tm.classList.remove('text-gray-500');
+                tr.classList.remove('tab-active'); tr.classList.add('text-gray-500');
+            }
+        }
+
         // Real-time Identity Search
         document.getElementById('userSearch').addEventListener('keyup', function() {
             let filter = this.value.toLowerCase();
@@ -172,7 +268,7 @@
             });
         });
 
-        // Data Packet Scrubber (Message Search)
+        // Message search
         document.getElementById('msgSearch').addEventListener('keyup', function() {
             let filter = this.value.toLowerCase();
             document.querySelectorAll('.msg-item').forEach(item => {
@@ -181,21 +277,24 @@
             });
         });
 
-        // Destruction Protocols
         function confirmDelete(userId, username) {
             if (username === 'admin') {
                 alert("👑 NEGATIVE: Master Aloy, your root access cannot be terminated.");
                 return;
             }
-            if (confirm(`🚨 WARNING: Are you sure you want to purge identity "${username}" from the database?`)) {
-                window.location.href = `/admin/delete_user/${userId}`;
+            if (confirm(`🚨 WARNING: Are you sure you want to purge identity "${username}" from the database? Tanang posts, matches, ug messages niya mawala.`)) {
+                postTo(`/admin/delete_user/${userId}`);
             }
         }
 
         function confirmDeleteMessage(msgId) {
             if (confirm(`🚨 Scrubber: Permanent removal of this data packet?`)) {
-                window.location.href = `/admin/delete_message/${msgId}`;
+                postTo(`/admin/delete_message/${msgId}`);
             }
+        }
+
+        function dismissReport(reportId) {
+            postTo(`/admin/dismiss_report/${reportId}`);
         }
     </script>
 </body>
