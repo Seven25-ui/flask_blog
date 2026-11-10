@@ -328,6 +328,29 @@ def match_partners(user_id):
     return people
 
 
+def chat_partners(user_id):
+    """Tanang naay chat: mga matches + bisan kinsa nga naay message history (wala na-block).
+    Pinakabag-o nga message una; ang mga matches nga wala pay message naa sa ilawom."""
+    last = {}
+    msgs = (Message.query.filter(or_(Message.sender_id == user_id, Message.receiver_id == user_id))
+            .order_by(Message.created_at.desc()).limit(500).all())
+    for m in msgs:
+        pid = m.receiver_id if m.sender_id == user_id else m.sender_id
+        last.setdefault(pid, m.created_at)
+    for p in match_partners(user_id):
+        last.setdefault(p.id, None)
+
+    people = []
+    for pid, when in last.items():
+        if pid == user_id or is_blocked(user_id, pid):
+            continue
+        u = db.session.get(User, pid)
+        if u:
+            people.append((when, u))
+    people.sort(key=lambda t: (t[0] is None, -(t[0].timestamp() if t[0] else 0)))
+    return [u for _, u in people]
+
+
 app.jinja_env.globals.update(is_following=is_following, get_follower_count=get_follower_count,
                              calc_age=calc_age)
 
@@ -629,9 +652,25 @@ def dashboard():
         return redirect(url_for('login'))
 
     if user.username == 'admin':
+        reports = []
+        for r in Report.query.order_by(Report.created_at.desc()).limit(100).all():
+            reports.append({
+                "id": r.id,
+                "reporter": db.session.get(User, r.reporter_id),
+                "reported": db.session.get(User, r.reported_id),
+                "reason": r.reason,
+                "created_at": r.created_at,
+                "times": Report.query.filter_by(reported_id=r.reported_id).count(),
+            })
+        report_counts = dict(db.session.query(Report.reported_id, func.count(Report.id))
+                             .group_by(Report.reported_id).all())
         return render_template('admin.html',
-                               users=User.query.all(),
-                               messages=Message.query.order_by(Message.created_at.desc()).all(),
+                               users=User.query.order_by(User.id.desc()).all(),
+                               messages=Message.query.order_by(Message.created_at.desc()).limit(100).all(),
+                               message_total=Message.query.count(),
+                               match_total=Match.query.count(),
+                               reports=reports,
+                               report_counts=report_counts,
                                user=user)
 
     posts = Post.query.filter_by(author_id=user.id).order_by(Post.created_at.desc()).all()
@@ -1131,15 +1170,17 @@ def inbox(user_id=None):
     me_id = session['user_id']
     me = current_user()
 
-    # Ang partners kay ang mga matches (bisan wala pa magsinultihanay)
-    partners = match_partners(me_id)
+    # Partners: mga matches + bisan kinsa nga naay message history
+    partners = chat_partners(me_id)
 
     active_chat, selected_user = [], None
+    is_match = False
     if user_id:
-        if not are_matched(me_id, user_id) or is_blocked(me_id, user_id):
-            flash("Matches ra ang pwede ma-chat.")
-            return redirect(url_for('matches'))
+        if user_id == me_id or is_blocked(me_id, user_id) or not db.session.get(User, user_id):
+            flash("Dili ma-abli ang chat nga ni.")
+            return redirect(url_for('inbox'))
 
+        is_match = are_matched(me_id, user_id)
         selected_user = db.session.get(User, user_id)
         if selected_user:
             active_chat = Message.query.filter(
@@ -1151,7 +1192,8 @@ def inbox(user_id=None):
             db.session.commit()
 
     return render_template('messages.html', partners=partners, active_chat=active_chat,
-                           selected_user=selected_user, user=me, active_tab='messages')
+                           selected_user=selected_user, user=me, active_tab='messages',
+                           is_match=is_match)
 
 
 @app.route('/send_message/<int:receiver_id>', methods=['POST'])
@@ -1163,9 +1205,15 @@ def send_message(receiver_id):
 
     if not db.session.get(User, receiver_id):
         return redirect(url_for('matches'))
-    # Matches ra, ug dili kung naay block
-    if not are_matched(me.id, receiver_id) or is_blocked(me.id, receiver_id):
-        return "Matches ra ang pwede ma-chat.", 403
+    if receiver_id == me.id or is_blocked(me.id, receiver_id):
+        return "Dili ka maka-message niini nga user.", 403
+    # Dili pa match: usa ra ka message hangtod mo-reply siya (panalipod batok spam)
+    if not are_matched(me.id, receiver_id):
+        they_replied = Message.query.filter_by(sender_id=receiver_id, receiver_id=me.id).first() is not None
+        i_sent = Message.query.filter_by(sender_id=me.id, receiver_id=receiver_id).count()
+        if not they_replied and i_sent >= 1:
+            flash("Usa ra ka message hangtod mo-reply siya (dili pa mo match).")
+            return redirect(url_for('inbox', user_id=receiver_id))
     if not content:
         return redirect(request.referrer or url_for('inbox', user_id=receiver_id))
 
@@ -1297,6 +1345,17 @@ def admin_delete_user(user_id):
         db.session.rollback()
         print(f"DATABASE ERROR: {e}")
         return f"Error: {e}", 500
+    return redirect(url_for('dashboard'))
+
+
+@app.route('/admin/dismiss_report/<int:report_id>', methods=['POST'])
+@login_required
+@master_admin_required
+def admin_dismiss_report(report_id):
+    r = db.session.get(Report, report_id)
+    if r:
+        db.session.delete(r)
+        db.session.commit()
     return redirect(url_for('dashboard'))
 
 
