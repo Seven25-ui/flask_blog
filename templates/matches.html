@@ -25,6 +25,7 @@
 
     <nav class="flex justify-around items-center py-4 border-b border-gray-900 bg-black/60 backdrop-blur sticky top-0 z-10">
         <a href="{{ url_for('discover') }}" class="text-[11px] font-black uppercase tracking-widest text-gray-500 hover:text-sky-400 transition-colors">Discover</a>
+        <a href="{{ url_for('search') }}" class="text-[11px] font-black uppercase tracking-widest text-gray-500 hover:text-sky-400 transition-colors">Search</a>
         <a href="{{ url_for('matches') }}" class="text-[11px] font-black uppercase tracking-widest text-sky-500">Matches</a>
         <a href="{{ url_for('inbox') }}" class="text-[11px] font-black uppercase tracking-widest text-gray-500 hover:text-sky-400 transition-colors">
             Messages{% if unread_count %} <span class="ml-1 bg-sky-500 text-white rounded-full px-2 py-0.5 text-[9px]">{{ unread_count }}</span>{% endif %}
